@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLogin } from '@/hooks/use-auth';
-import { guestStorage } from '@/services/storage';
+import { guestStorage, merchantStorage } from '@/services/storage';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -36,6 +36,16 @@ export default function LoginScreen() {
   const onGuest = async () => {
     await guestStorage.enable();
     router.replace('/(tabs)/explore');
+  };
+
+  const onListBusiness = async () => {
+    await guestStorage.enable();
+    const existing = await merchantStorage.load();
+    if (existing) {
+      router.replace('/(merchant)' as never);
+    } else {
+      router.push('/merchant-onboarding');
+    }
   };
 
   const canSubmit = email.trim().length > 0 && password.length > 0 && !login.isPending;
@@ -102,6 +112,14 @@ export default function LoginScreen() {
           activeOpacity={0.85}
           onPress={onGuest}>
           <Text style={styles.guestText}>Continue as guest</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.merchantButton}
+          activeOpacity={0.85}
+          onPress={onListBusiness}>
+          <Ionicons name="storefront-outline" size={18} color="#000" style={styles.merchantIcon} />
+          <Text style={styles.merchantText}>List your business</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -224,6 +242,23 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 15,
     fontWeight: '600',
+  },
+  merchantButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C4F27F',
+    borderRadius: 8,
+    height: 50,
+    marginBottom: 12,
+  },
+  merchantIcon: {
+    marginRight: 8,
+  },
+  merchantText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
   },
   signupRow: {
     alignItems: 'center',

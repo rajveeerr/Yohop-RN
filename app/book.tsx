@@ -199,7 +199,10 @@ export default function BookScreen() {
               </TouchableOpacity>
             )}
             <View style={styles.bottomBar}>
-              <TouchableOpacity style={styles.bottomBtn} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.bottomBtn}
+                activeOpacity={0.85}
+                onPress={() => router.push('/details')}>
                 {isEvent ? (
                   <Ionicons name="ticket-outline" size={16} color="#fff" />
                 ) : (
@@ -213,7 +216,10 @@ export default function BookScreen() {
                   {isEvent ? 'Book a ticket' : 'Book a table'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.bottomBtn} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.bottomBtn}
+                activeOpacity={0.85}
+                onPress={() => router.push('/booked')}>
                 <Ionicons name="finger-print" size={16} color="#fff" />
                 <Text style={styles.bottomBtnText}>Check-in Now</Text>
               </TouchableOpacity>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx expo install react-native-svg)",
+      "PowerShell(npx tsc --noEmit -p . 2>&1)",
+      "PowerShell(npx expo install expo-linear-gradient)",
+      "Bash(grep \"merchant\\\\|\\(tabs\\)\\\\|\\(merchant\\)\" \"/c/yohop-yashika-app/.expo/types/router.d.ts\" | head -20)",
+      "Read(//c/yohop-yashika-app/.expo/types/**)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)"
+    ]
+  }
+}

@@ -1,8 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -11,10 +9,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLogout, useMe } from '@/hooks/use-auth';
+import { UserDrawer } from '@/components/user-drawer';
+import { useMe } from '@/hooks/use-auth';
 import { useActivity } from '@/hooks/use-bookings';
 import { useMyRank } from '@/hooks/use-leaderboard';
 import { useProfileStats } from '@/hooks/use-profile';
+import { useRouter } from 'expo-router';
+import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 
 type Interest = { key: string; label: string; emoji: string };
 const INTERESTS: Interest[] = [
@@ -52,25 +53,12 @@ function formatPoints(n: number): string {
 export default function ProfileScreen() {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>('list');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: me } = useMe();
   const { data: stats } = useProfileStats();
   const { data: myRank } = useMyRank('all-time');
   const activity = useActivity();
-  const logout = useLogout();
-
-  const handleLogout = () => {
-    Alert.alert('Log out?', 'You will need to sign in again.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/login');
-        },
-      },
-    ]);
-  };
+  const merchantProfile = useStoredMerchantProfile();
 
   const firstName = me?.name?.split(' ')[0] ?? 'You';
   const tier = me?.loyaltyTier ?? 'BRONZE';
@@ -82,10 +70,12 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topRow}>
         <Text style={styles.username}>{usernameFrom(me?.email)}</Text>
-        <TouchableOpacity hitSlop={8} onPress={handleLogout}>
+        <TouchableOpacity hitSlop={8} onPress={() => setDrawerOpen(true)}>
           <Ionicons name="menu" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      <UserDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <ScrollView
         contentContainerStyle={styles.container}
@@ -110,6 +100,16 @@ export default function ProfileScreen() {
             Avid foodie, gig-goer and spa enthusiast. Delhi&apos;s Best spots,
             one tap at a time.
           </Text>
+          {merchantProfile && (
+            <TouchableOpacity
+              style={styles.proBadge}
+              activeOpacity={0.85}
+              onPress={() => router.replace('/(merchant)' as never)}>
+              <Ionicons name="briefcase" size={11} color="#C4F27F" />
+              <Text style={styles.proBadgeText}>Professional Dashboard</Text>
+              <Ionicons name="chevron-forward" size={12} color="#C4F27F" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.btnRow}>
@@ -479,6 +479,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     marginTop: 6,
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(196,242,127,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(196,242,127,0.35)',
+  },
+  proBadgeText: {
+    color: '#C4F27F',
+    fontSize: 11,
+    fontWeight: '700',
   },
   btnRow: {
     flexDirection: 'row',

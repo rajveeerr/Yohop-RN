@@ -220,7 +220,12 @@ export default function CheckoutScreen() {
         <TouchableOpacity style={styles.kbBtn} activeOpacity={0.7}>
           <Ionicons name="keypad-outline" size={20} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.nextBtn} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.nextBtn}
+          activeOpacity={0.9}
+          onPress={() =>
+            router.push({ pathname: '/payment', params: { amount: '20.04' } })
+          }>
           <Text style={styles.nextBtnText}>Next</Text>
           <Text style={styles.nextBtnPrice}>US$10.71</Text>
         </TouchableOpacity>

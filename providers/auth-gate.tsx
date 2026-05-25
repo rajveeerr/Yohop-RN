@@ -2,7 +2,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
 import { useMe } from '../hooks/use-auth';
 import { setUnauthorizedHandler } from '../services/api';
-import { guestStorage } from '../services/storage';
+import { guestStorage, merchantStorage } from '../services/storage';
 
 const AUTH_ROUTES = new Set([
   'login',
@@ -25,6 +25,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setIsGuest(v);
       setGuestChecked(true);
     });
+    merchantStorage.load();
     const unsub = guestStorage.subscribe(() => {
       setIsGuest(guestStorage.isGuestSync());
     });

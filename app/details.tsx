@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +22,7 @@ export default function DetailsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" />
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -29,7 +31,7 @@ export default function DetailsScreen() {
           onPress={() => router.back()}
           hitSlop={10}
           style={styles.close}>
-          <Ionicons name="close" size={22} color="#000" />
+          <Ionicons name="close" size={22} color="#fff" />
         </TouchableOpacity>
 
         <Text style={styles.title}>Details</Text>
@@ -38,7 +40,7 @@ export default function DetailsScreen() {
         <TextInput
           style={styles.input}
           placeholder="Enter you name"
-          placeholderTextColor="#9B9B9B"
+          placeholderTextColor="#6E6E6E"
           value={name}
           onChangeText={setName}
         />
@@ -67,7 +69,7 @@ export default function DetailsScreen() {
         <TextInput
           style={styles.input}
           placeholder="Enter you name"
-          placeholderTextColor="#9B9B9B"
+          placeholderTextColor="#6E6E6E"
           value={occasion}
           onChangeText={setOccasion}
         />
@@ -75,7 +77,7 @@ export default function DetailsScreen() {
         <Text style={styles.label}>Choose your waiter</Text>
         <TouchableOpacity style={styles.dropdown} activeOpacity={0.8}>
           <Text style={styles.dropdownText}>NAME</Text>
-          <Ionicons name="chevron-down" size={16} color="#000" />
+          <Ionicons name="chevron-down" size={16} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.promoRow} activeOpacity={0.8}>
@@ -84,7 +86,7 @@ export default function DetailsScreen() {
             <Text style={styles.promoApplied}>Promotion applied</Text>
             <Text style={styles.promoSaving}>You&apos;re saving US$25</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#000" />
+          <Ionicons name="chevron-forward" size={16} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.divider} />
@@ -100,7 +102,7 @@ export default function DetailsScreen() {
           onPress={() => setUseLoyalty((v) => !v)}
           activeOpacity={0.8}>
           <View style={[styles.checkbox, useLoyalty && styles.checkboxChecked]}>
-            {useLoyalty && <Ionicons name="checkmark" size={11} color="#fff" />}
+            {useLoyalty && <Ionicons name="checkmark" size={11} color="#000" />}
           </View>
           <Text style={styles.checkLabel}>Use Loyalty Points</Text>
         </TouchableOpacity>
@@ -136,7 +138,7 @@ function PriceRow({
           {label}
         </Text>
         {hasInfo && (
-          <Ionicons name="information-circle-outline" size={12} color="#9B9B9B" />
+          <Ionicons name="information-circle-outline" size={12} color="#888" />
         )}
       </View>
       <Text
@@ -152,7 +154,7 @@ function PriceRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: '#000' },
   container: {
     paddingHorizontal: 20,
     paddingBottom: 30,
@@ -168,23 +170,25 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#000',
+    color: '#fff',
     marginBottom: 14,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#000',
+    color: '#fff',
     marginTop: 10,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#EFEFEF',
+    backgroundColor: '#1C1C1C',
     borderRadius: 22,
     paddingHorizontal: 16,
     height: 40,
     fontSize: 13,
-    color: '#000',
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
   rowTwo: {
     flexDirection: 'row',
@@ -197,13 +201,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#EFEFEF',
+    backgroundColor: '#1C1C1C',
     borderRadius: 22,
     paddingHorizontal: 16,
     height: 40,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
   dropdownText: {
-    color: '#000',
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -229,7 +235,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: '#1F1F1F',
     marginTop: 10,
     marginBottom: 8,
   },
@@ -246,19 +252,19 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 13,
-    color: '#333',
+    color: '#BFBFBF',
   },
   priceLabelBold: {
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
   },
   priceValue: {
     fontSize: 13,
-    color: '#333',
+    color: '#BFBFBF',
   },
   priceValueBold: {
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
   },
   checkRow: {
     flexDirection: 'row',
@@ -272,27 +278,27 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 3,
     borderWidth: 1.5,
-    borderColor: '#666',
+    borderColor: '#888',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#000',
-    borderColor: '#000',
+    backgroundColor: '#fff',
+    borderColor: '#fff',
   },
   checkLabel: {
-    color: '#000',
+    color: '#fff',
     fontSize: 13,
   },
   bookBtn: {
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
     borderRadius: 28,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
   },
   bookBtnText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 15,
     fontWeight: '700',
   },

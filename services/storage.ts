@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = 'authToken';
 const GUEST_KEY = 'guestMode';
+const MERCHANT_KEY = 'merchantProfile';
 
 const memory: Record<string, string | undefined> = {};
 
@@ -70,5 +71,70 @@ export const guestStorage = {
   subscribe(fn: () => void): () => void {
     guestSubscribers.add(fn);
     return () => guestSubscribers.delete(fn);
+  },
+};
+
+export type StoredMerchantProfile = {
+  category: 'restaurant' | 'cafe' | 'retail' | 'other' | null;
+  businessName: string;
+  businessBio: string;
+  logoUri: string | null;
+  photos: string[];
+  address: string;
+  websiteUrl: string;
+  email: string;
+  contactNumber: string;
+  services: string;
+  onboardedAt: string;
+};
+
+const merchantSubscribers = new Set<() => void>();
+let merchantCache: StoredMerchantProfile | null = null;
+let merchantLoaded = false;
+
+function notifyMerchant() {
+  merchantSubscribers.forEach((fn) => fn());
+}
+
+export const merchantStorage = {
+  async load(): Promise<StoredMerchantProfile | null> {
+    if (merchantLoaded) return merchantCache;
+    const raw = await safeGet(MERCHANT_KEY);
+    if (raw) {
+      try {
+        merchantCache = JSON.parse(raw) as StoredMerchantProfile;
+      } catch {
+        merchantCache = null;
+      }
+    }
+    merchantLoaded = true;
+    notifyMerchant();
+    return merchantCache;
+  },
+  getSync(): StoredMerchantProfile | null {
+    return merchantCache;
+  },
+  isOnboardedSync(): boolean {
+    return merchantCache !== null;
+  },
+  async save(profile: Omit<StoredMerchantProfile, 'onboardedAt'>) {
+    const next: StoredMerchantProfile = {
+      ...profile,
+      onboardedAt: new Date().toISOString(),
+    };
+    merchantCache = next;
+    merchantLoaded = true;
+    await safeSet(MERCHANT_KEY, JSON.stringify(next));
+    notifyMerchant();
+  },
+  async clear() {
+    merchantCache = null;
+    merchantLoaded = true;
+    await safeRemove(MERCHANT_KEY);
+    notifyMerchant();
+  },
+  subscribe(fn: () => void): () => void {
+    merchantSubscribers.add(fn);
+    return () => merchantSubscribers.delete(fn);
   },
 };
