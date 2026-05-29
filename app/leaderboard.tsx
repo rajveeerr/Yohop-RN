@@ -9,41 +9,22 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMe } from '@/hooks/use-auth';
+import { useLeaderboard, useMyRank } from '@/hooks/use-leaderboard';
+import type { LeaderboardEntry, LeaderboardPeriod } from '@/services/types';
 
-type Period = 'week' | 'month' | 'all';
 type Scope = 'friends' | 'city' | 'global';
 
-const PERIODS: { key: Period; label: string }[] = [
+const PERIODS: { key: LeaderboardPeriod; label: string }[] = [
   { key: 'week', label: 'This week' },
   { key: 'month', label: 'This month' },
-  { key: 'all', label: 'All time' },
+  { key: 'all-time', label: 'All time' },
 ];
 
 const SCOPES: { key: Scope; label: string }[] = [
   { key: 'friends', label: 'Friends' },
   { key: 'city', label: 'City' },
   { key: 'global', label: 'Global' },
-];
-
-type Entry = {
-  rank: number;
-  name: string;
-  points: number;
-  checkins: number;
-  isMe?: boolean;
-};
-
-const ENTRIES: Entry[] = [
-  { rank: 1, name: 'Sneha A.', points: 5100, checkins: 28 },
-  { rank: 2, name: 'Rahul A.', points: 4200, checkins: 24 },
-  { rank: 3, name: 'Anonya H.', points: 1900, checkins: 16 },
-  { rank: 4, name: 'Manav J.', points: 980, checkins: 14 },
-  { rank: 5, name: 'Dev K.', points: 820, checkins: 12 },
-  { rank: 6, name: 'Aria L.', points: 540, checkins: 9 },
-  { rank: 7, name: 'You · Yashika', points: 2400, checkins: 11, isMe: true },
-  { rank: 8, name: 'Kabir M.', points: 480, checkins: 8 },
-  { rank: 9, name: 'Riya N.', points: 410, checkins: 7 },
-  { rank: 10, name: 'Aarav S.', points: 360, checkins: 6 },
 ];
 
 function formatPoints(n: number): string {
@@ -62,21 +43,32 @@ function initials(name: string): string {
 
 export default function LeaderboardScreen() {
   const router = useRouter();
-  const [period, setPeriod] = useState<Period>('week');
-  const [scope, setScope] = useState<Scope>('friends');
+  const [period, setPeriod] = useState<LeaderboardPeriod>('week');
+  const [scope, setScope] = useState<Scope>('global');
+  const { data: me } = useMe();
+  const { data: entries, isLoading } = useLeaderboard(period);
+  const { data: myRank } = useMyRank(period);
 
-  const me = ENTRIES.find((e) => e.isMe);
-  const top3 = useMemo(() => ENTRIES.filter((e) => e.rank <= 3), []);
+  const list: LeaderboardEntry[] = entries ?? [];
+  const top3 = useMemo(() => list.filter((e) => e.rank <= 3), [list]);
   const rest = useMemo(
-    () => ENTRIES.filter((e) => e.rank > 3 && !e.isMe).slice(0, 6),
-    [],
+    () =>
+      list
+        .filter((e) => e.rank > 3 && e.userId !== me?.id)
+        .slice(0, 6),
+    [list, me?.id],
   );
 
   const podiumOrder = [
     top3.find((e) => e.rank === 2),
     top3.find((e) => e.rank === 1),
     top3.find((e) => e.rank === 3),
-  ].filter((x): x is Entry => !!x);
+  ].filter((x): x is LeaderboardEntry => !!x);
+
+  const myEntry = list.find((e) => e.userId === me?.id);
+  const myName = me?.name ? `You · ${me.name.split(' ')[0]}` : 'You';
+  const myPoints = myEntry?.points ?? myRank?.points ?? 0;
+  const myRankNum = myEntry?.rank ?? myRank?.rank;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -138,99 +130,106 @@ export default function LeaderboardScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.podium}>
-          {podiumOrder.map((e) => {
-            const isFirst = e.rank === 1;
-            return (
-              <View
-                key={e.rank}
-                style={[styles.podiumCol, isFirst && styles.podiumColFirst]}>
-                {isFirst && (
-                  <View style={styles.crown}>
-                    <Ionicons name="trophy" size={16} color="#FFB300" />
+        {isLoading && list.length === 0 ? (
+          <Text style={styles.empty}>Loading leaderboard…</Text>
+        ) : list.length === 0 ? (
+          <Text style={styles.empty}>No rankings yet</Text>
+        ) : (
+          <>
+            <View style={styles.podium}>
+              {podiumOrder.map((e) => {
+                const isFirst = e.rank === 1;
+                return (
+                  <View
+                    key={e.userId}
+                    style={[styles.podiumCol, isFirst && styles.podiumColFirst]}>
+                    {isFirst && (
+                      <View style={styles.crown}>
+                        <Ionicons name="trophy" size={16} color="#FFB300" />
+                      </View>
+                    )}
+                    <View
+                      style={[
+                        styles.podiumAvatar,
+                        isFirst && styles.podiumAvatarFirst,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.podiumInitials,
+                          isFirst && styles.podiumInitialsFirst,
+                        ]}>
+                        {initials(e.name)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.podiumName, isFirst && styles.podiumNameFirst]}>
+                      {e.name}
+                    </Text>
+                    <Text
+                      style={[styles.podiumPts, isFirst && styles.podiumPtsFirst]}>
+                      {formatPoints(e.points)}
+                    </Text>
+                    <View
+                      style={[
+                        styles.podiumBlock,
+                        isFirst ? styles.podiumBlockFirst : null,
+                        e.rank === 2 ? styles.podiumBlockSecond : null,
+                        e.rank === 3 ? styles.podiumBlockThird : null,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.podiumRank,
+                          isFirst && styles.podiumRankFirst,
+                        ]}>
+                        {e.rank}
+                      </Text>
+                    </View>
                   </View>
-                )}
-                <View
-                  style={[
-                    styles.podiumAvatar,
-                    isFirst && styles.podiumAvatarFirst,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.podiumInitials,
-                      isFirst && styles.podiumInitialsFirst,
-                    ]}>
-                    {initials(e.name)}
-                  </Text>
+                );
+              })}
+            </View>
+
+            {myRankNum ? (
+              <View style={styles.youCard}>
+                <View style={styles.youRankPill}>
+                  <Text style={styles.youRankText}>#{myRankNum}</Text>
                 </View>
-                <Text
-                  style={[styles.podiumName, isFirst && styles.podiumNameFirst]}>
-                  {e.name}
-                </Text>
-                <Text
-                  style={[styles.podiumPts, isFirst && styles.podiumPtsFirst]}>
-                  {formatPoints(e.points)}
-                </Text>
-                <View
-                  style={[
-                    styles.podiumBlock,
-                    isFirst ? styles.podiumBlockFirst : null,
-                    e.rank === 2 ? styles.podiumBlockSecond : null,
-                    e.rank === 3 ? styles.podiumBlockThird : null,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.podiumRank,
-                      isFirst && styles.podiumRankFirst,
-                    ]}>
-                    {e.rank}
-                  </Text>
+                <View style={styles.youAvatar}>
+                  <Text style={styles.youAvatarText}>{initials(myName)}</Text>
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.youName}>{myName}</Text>
+                  <Text style={styles.youMeta}>this period</Text>
+                </View>
+                <Text style={styles.youPoints}>{formatPoints(myPoints)}</Text>
               </View>
-            );
-          })}
-        </View>
+            ) : null}
 
-        {me ? (
-          <View style={styles.youCard}>
-            <View style={styles.youRankPill}>
-              <Text style={styles.youRankText}>#{me.rank}</Text>
+            <View style={styles.listCard}>
+              {rest.map((e, idx) => (
+                <View
+                  key={e.userId}
+                  style={[
+                    styles.row,
+                    idx === rest.length - 1 && { borderBottomWidth: 0 },
+                  ]}>
+                  <Text style={styles.rank}>{e.rank}</Text>
+                  <View style={styles.rowAvatar}>
+                    <Text style={styles.rowAvatarText}>{initials(e.name)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowName}>{e.name}</Text>
+                  </View>
+                  <Text style={styles.rowPoints}>{e.points.toLocaleString()}</Text>
+                </View>
+              ))}
             </View>
-            <View style={styles.youAvatar}>
-              <Text style={styles.youAvatarText}>YS</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.youName}>{me.name}</Text>
-              <Text style={styles.youMeta}>this period</Text>
-            </View>
-            <Text style={styles.youPoints}>{formatPoints(me.points)}</Text>
-          </View>
-        ) : null}
 
-        <View style={styles.listCard}>
-          {rest.map((e, idx) => (
-            <View
-              key={e.rank}
-              style={[
-                styles.row,
-                idx === rest.length - 1 && { borderBottomWidth: 0 },
-              ]}>
-              <Text style={styles.rank}>{e.rank}</Text>
-              <View style={styles.rowAvatar}>
-                <Text style={styles.rowAvatarText}>{initials(e.name)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowName}>{e.name}</Text>
-                <Text style={styles.rowMeta}>{e.checkins} check-ins this week</Text>
-              </View>
-              <Text style={styles.rowPoints}>{e.points.toLocaleString()}</Text>
-            </View>
-          ))}
-        </View>
-
-        <TouchableOpacity style={styles.expandBtn} activeOpacity={0.8}>
-          <Ionicons name="chevron-down" size={18} color="#000" />
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.expandBtn} activeOpacity={0.8}>
+              <Ionicons name="chevron-down" size={18} color="#000" />
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -299,6 +298,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scopePillTextActive: { color: '#C4F27F', fontWeight: '700' },
+  empty: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 60,
+  },
   podium: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -489,11 +494,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-  },
-  rowMeta: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    marginTop: 2,
   },
   rowPoints: {
     color: 'rgba(255,255,255,0.85)',

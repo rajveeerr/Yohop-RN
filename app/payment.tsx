@@ -1,6 +1,7 @@
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  Alert,
   StatusBar,
   StyleSheet,
   Text,
@@ -8,17 +9,41 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCreatePaymentIntent } from '@/hooks/use-payments';
+import type { PaymentPurpose } from '@/hooks/use-payments';
 
 export default function PaymentScreen() {
   const router = useRouter();
-  const { amount } = useLocalSearchParams<{ amount?: string }>();
-  const total = amount ?? '20.04';
+  const params = useLocalSearchParams<{
+    amount?: string;
+    purpose?: PaymentPurpose;
+    referenceId?: string;
+  }>();
+  const total = params.amount ?? '20.04';
+  const purpose = params.purpose ?? 'ORDER';
+  const intent = useCreatePaymentIntent();
 
-  const onSelect = (id: 'cash' | 'paypal' | 'card') => {
+  const onSelect = async (id: 'cash' | 'paypal' | 'card') => {
     if (id === 'card') {
       router.push({ pathname: '/add-card', params: { amount: total } });
-    } else {
-      router.push({ pathname: '/placing-order', params: { amount: total } });
+      return;
+    }
+    try {
+      const result = await intent.mutateAsync({
+        amount: Number(total),
+        purpose,
+        referenceId: params.referenceId,
+      });
+      router.push({
+        pathname: '/placing-order',
+        params: {
+          amount: total,
+          orderId: result.orderId,
+          paymentId: result.paymentId ?? '',
+        },
+      });
+    } catch (e: any) {
+      Alert.alert('Payment failed', e?.message ?? 'Please try again.');
     }
   };
 

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -10,24 +10,40 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
-import {
-  MOCK_ANALYTICS_KPIS,
-  MOCK_ANALYTICS_VIEWS,
-} from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useMerchantDealsList } from '@/hooks/use-merchant-crud';
+import { useMerchantStats } from '@/hooks/use-merchant-stats';
 
 type Range = '7d' | '30d' | '90d';
 
-const TOP_DEALS = [
-  { id: '1', title: 'Happy Hour 30% Off', views: 1240, redemptions: 84, ctr: '11.6%' },
-  { id: '2', title: 'Weekend Brunch BOGO', views: 540, redemptions: 32, ctr: '8.4%' },
-  { id: '3', title: 'Flash: ₹200 Off Pizza', views: 188, redemptions: 11, ctr: '6.1%' },
-];
+function formatCurrency(n: number | undefined): string {
+  if (n === undefined) return '—';
+  return `$${n.toLocaleString()}`;
+}
+
+function formatPct(n: number | undefined, sign = true): string {
+  if (n === undefined) return '—';
+  const s = sign && n > 0 ? '+' : '';
+  return `${s}${n.toFixed(0)}%`;
+}
 
 export default function MerchantAnalyticsScreen() {
   const router = useRouter();
   const [range, setRange] = useState<Range>('7d');
+  const { data: me } = useMe();
+  const merchantId = me?.merchantId ?? undefined;
+  const { data: stats, isLoading: statsLoading } = useMerchantStats(merchantId);
+  const { data: deals } = useMerchantDealsList(merchantId);
 
-  const maxView = Math.max(...MOCK_ANALYTICS_VIEWS.map((p) => p.value));
+  const viewsData = stats?.weeklyViews ?? [];
+  const maxView = Math.max(1, ...viewsData.map((p) => p.value));
+  const totalViews = viewsData.reduce((s, p) => s + p.value, 0);
+
+  const topDeals = useMemo(() => {
+    return [...(deals ?? [])]
+      .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+      .slice(0, 5);
+  }, [deals]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -65,62 +81,105 @@ export default function MerchantAnalyticsScreen() {
 
         <SectionHeader label="Profile views" />
         <View style={styles.chartCard}>
-          <View style={styles.chartRow}>
-            {MOCK_ANALYTICS_VIEWS.map((p) => (
-              <View key={p.label} style={styles.barCol}>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: 12 + (p.value / maxView) * 120 },
-                  ]}
-                />
-                <Text style={styles.barLabel}>{p.label}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.chartFooter}>
-            <Text style={styles.chartFooterText}>
-              Total{' '}
-              <Text style={styles.chartFooterAccent}>
-                {MOCK_ANALYTICS_VIEWS.reduce((s, p) => s + p.value, 0)}
-              </Text>{' '}
-              views
+          {viewsData.length === 0 ? (
+            <Text style={styles.empty}>
+              {statsLoading ? 'Loading…' : 'No view data yet'}
             </Text>
-            <Text style={styles.chartFooterDelta}>+22% vs prior</Text>
-          </View>
+          ) : (
+            <>
+              <View style={styles.chartRow}>
+                {viewsData.map((p) => (
+                  <View key={p.day} style={styles.barCol}>
+                    <View
+                      style={[
+                        styles.bar,
+                        { height: 12 + (p.value / maxView) * 120 },
+                      ]}
+                    />
+                    <Text style={styles.barLabel}>{p.day}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.chartFooter}>
+                <Text style={styles.chartFooterText}>
+                  Total{' '}
+                  <Text style={styles.chartFooterAccent}>
+                    {totalViews.toLocaleString()}
+                  </Text>{' '}
+                  views
+                </Text>
+                {stats?.checkInsDeltaPct !== undefined && (
+                  <Text style={styles.chartFooterDelta}>
+                    {formatPct(stats.checkInsDeltaPct)} vs prior
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
         </View>
 
         <SectionHeader label="Key metrics" />
         <View style={styles.kpiGrid}>
-          {MOCK_ANALYTICS_KPIS.map((k) => (
-            <View key={k.label} style={styles.kpiCard}>
-              <Text style={styles.kpiValue}>{k.value}</Text>
-              <Text style={styles.kpiLabel}>{k.label}</Text>
-            </View>
-          ))}
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>{formatCurrency(stats?.totalRevenue)}</Text>
+            <Text style={styles.kpiLabel}>Total revenue</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>
+              {stats?.totalCheckIns !== undefined
+                ? stats.totalCheckIns.toLocaleString()
+                : '—'}
+            </Text>
+            <Text style={styles.kpiLabel}>Check-ins</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>
+              {stats?.avgGroupSize !== undefined
+                ? stats.avgGroupSize.toFixed(1)
+                : '—'}
+            </Text>
+            <Text style={styles.kpiLabel}>Avg group size</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>
+              {stats?.conversionRate !== undefined
+                ? `${stats.conversionRate.toFixed(0)}%`
+                : '—'}
+            </Text>
+            <Text style={styles.kpiLabel}>Conversion</Text>
+          </View>
         </View>
 
         <SectionHeader label="Top deals" />
         <View style={styles.tableCard}>
-          {TOP_DEALS.map((d, idx) => (
-            <View
-              key={d.id}
-              style={[
-                styles.tableRow,
-                idx === TOP_DEALS.length - 1 && { borderBottomWidth: 0 },
-              ]}>
-              <Text style={styles.rank}>#{idx + 1}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tableTitle}>{d.title}</Text>
-                <Text style={styles.tableSub}>
-                  {d.views} views · {d.redemptions} redemptions
-                </Text>
-              </View>
-              <View style={styles.ctrPill}>
-                <Text style={styles.ctrText}>{d.ctr}</Text>
-              </View>
-            </View>
-          ))}
+          {topDeals.length === 0 ? (
+            <Text style={styles.empty}>No deals yet</Text>
+          ) : (
+            topDeals.map((d, idx) => {
+              const views = d.viewCount ?? 0;
+              const redemptions = d.currentRedemptions ?? 0;
+              const ctr = views > 0 ? (redemptions / views) * 100 : 0;
+              return (
+                <View
+                  key={d.id}
+                  style={[
+                    styles.tableRow,
+                    idx === topDeals.length - 1 && { borderBottomWidth: 0 },
+                  ]}>
+                  <Text style={styles.rank}>#{idx + 1}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tableTitle}>{d.title}</Text>
+                    <Text style={styles.tableSub}>
+                      {views.toLocaleString()} views · {redemptions} redemptions
+                    </Text>
+                  </View>
+                  <View style={styles.ctrPill}>
+                    <Text style={styles.ctrText}>{ctr.toFixed(1)}%</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -285,5 +344,11 @@ const styles = StyleSheet.create({
     color: '#C4F27F',
     fontSize: 11,
     fontWeight: '800',
+  },
+  empty: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 24,
   },
 });

@@ -11,128 +11,48 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSavedDeals, useToggleSavedDeal } from '@/hooks/use-deals';
+import type { Deal } from '@/services/types';
 
-type Filter = 'all' | 'bars' | 'rooftops' | 'speakeasies' | 'clubs';
+type Filter = 'all' | 'flash' | 'bounty' | 'standard';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'bars', label: 'Bars' },
-  { key: 'rooftops', label: 'Rooftops' },
-  { key: 'speakeasies', label: 'Speakeasies' },
-  { key: 'clubs', label: 'Clubs' },
+  { key: 'flash', label: 'Flash Sale' },
+  { key: 'bounty', label: 'Bounty' },
+  { key: 'standard', label: 'Standard' },
 ];
 
-type Venue = {
-  id: string;
-  name: string;
-  tag: 'ROOFTOP' | 'SPEAKEASY' | 'CLUB' | 'BAR';
-  category: Filter;
-  image: string;
-};
+function tagFor(d: Deal): { label: string; key: Filter } {
+  if (d.isFlashSale) return { label: 'FLASH', key: 'flash' };
+  if (d.isBounty) return { label: 'BOUNTY', key: 'bounty' };
+  return { label: 'DEAL', key: 'standard' };
+}
 
-const VENUES: Venue[] = [
-  {
-    id: '1',
-    name: 'Neon Heights',
-    tag: 'ROOFTOP',
-    category: 'rooftops',
-    image: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&q=80',
-  },
-  {
-    id: '2',
-    name: 'The Velvet Bar',
-    tag: 'SPEAKEASY',
-    category: 'speakeasies',
-    image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&q=80',
-  },
-  {
-    id: '3',
-    name: 'Circuit 01',
-    tag: 'CLUB',
-    category: 'clubs',
-    image: 'https://images.unsplash.com/photo-1545128485-c400ce7b6892?w=400&q=80',
-  },
-  {
-    id: '4',
-    name: 'Circuit 01',
-    tag: 'CLUB',
-    category: 'clubs',
-    image: 'https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=400&q=80',
-  },
-  {
-    id: '5',
-    name: 'Neon Heights',
-    tag: 'ROOFTOP',
-    category: 'rooftops',
-    image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&q=80',
-  },
-  {
-    id: '6',
-    name: 'The Velvet Bar',
-    tag: 'SPEAKEASY',
-    category: 'speakeasies',
-    image: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=400&q=80',
-  },
-  {
-    id: '7',
-    name: 'Neon Heights',
-    tag: 'ROOFTOP',
-    category: 'rooftops',
-    image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=400&q=80',
-  },
-  {
-    id: '8',
-    name: 'The Velvet Bar',
-    tag: 'SPEAKEASY',
-    category: 'speakeasies',
-    image: 'https://images.unsplash.com/photo-1581974944026-5d6ed762f617?w=400&q=80',
-  },
-  {
-    id: '9',
-    name: 'Circuit 01',
-    tag: 'CLUB',
-    category: 'clubs',
-    image: 'https://images.unsplash.com/photo-1602513915077-39bdc4d29f33?w=400&q=80',
-  },
-  {
-    id: '10',
-    name: 'The Velvet Bar',
-    tag: 'SPEAKEASY',
-    category: 'speakeasies',
-    image: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=400&q=80',
-  },
-  {
-    id: '11',
-    name: 'Circuit 01',
-    tag: 'CLUB',
-    category: 'clubs',
-    image: 'https://images.unsplash.com/photo-1545128485-c400ce7b6892?w=400&q=80',
-  },
-  {
-    id: '12',
-    name: 'Neon Heights',
-    tag: 'ROOFTOP',
-    category: 'rooftops',
-    image: 'https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=400&q=80',
-  },
-];
+const FALLBACK_IMG =
+  'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&q=80';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [liked, setLiked] = useState<Record<string, boolean>>(
-    VENUES.reduce((acc, v) => ({ ...acc, [v.id]: true }), {}),
-  );
+  const { data, isLoading } = useSavedDeals();
+  const toggle = useToggleSavedDeal();
+
+  const deals = data ?? [];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return VENUES.filter((v) => {
-      if (filter !== 'all' && v.category !== filter) return false;
-      if (q && !v.name.toLowerCase().includes(q)) return false;
+    return deals.filter((d) => {
+      const t = tagFor(d).key;
+      if (filter !== 'all' && t !== filter) return false;
+      if (q) {
+        const hay = `${d.title} ${d.merchant?.businessName ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
-  }, [query, filter]);
+  }, [deals, query, filter]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -156,7 +76,7 @@ export default function FavoritesScreen() {
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search saved venues..."
+          placeholder="Search saved deals..."
           placeholderTextColor="rgba(255,255,255,0.4)"
         />
       </View>
@@ -185,31 +105,43 @@ export default function FavoritesScreen() {
       <ScrollView
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}>
-        {filtered.map((v) => (
-          <View key={v.id} style={styles.card}>
-            <Image source={{ uri: v.image }} style={styles.cardImg} />
-            <View style={styles.gradientOverlay} />
-            <View style={styles.cardTagRow}>
-              <View style={styles.tagPill}>
-                <Text style={styles.tagText}>{v.tag}</Text>
-              </View>
+        {isLoading && filtered.length === 0 ? (
+          <Text style={styles.emptyText}>Loading…</Text>
+        ) : filtered.length === 0 ? (
+          <Text style={styles.emptyText}>
+            {deals.length === 0 ? 'No saved deals yet.' : 'No saved deals match.'}
+          </Text>
+        ) : (
+          filtered.map((d) => {
+            const t = tagFor(d);
+            const img = d.images?.[0] ?? FALLBACK_IMG;
+            const title = d.merchant?.businessName ?? d.title;
+            return (
               <TouchableOpacity
-                hitSlop={8}
+                key={d.id}
+                style={styles.card}
+                activeOpacity={0.85}
                 onPress={() =>
-                  setLiked((prev) => ({ ...prev, [v.id]: !prev[v.id] }))
+                  router.push({ pathname: '/deal', params: { id: d.id } })
                 }>
-                <Ionicons
-                  name={liked[v.id] ? 'heart' : 'heart-outline'}
-                  size={18}
-                  color={liked[v.id] ? '#E53935' : '#fff'}
-                />
+                <Image source={{ uri: img }} style={styles.cardImg} />
+                <View style={styles.gradientOverlay} />
+                <View style={styles.cardTagRow}>
+                  <View style={styles.tagPill}>
+                    <Text style={styles.tagText}>{t.label}</Text>
+                  </View>
+                  <TouchableOpacity
+                    hitSlop={8}
+                    onPress={() => toggle.mutate(d.id)}>
+                    <Ionicons name="heart" size={18} color="#E53935" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {title}
+                </Text>
               </TouchableOpacity>
-            </View>
-            <Text style={styles.cardTitle}>{v.name}</Text>
-          </View>
-        ))}
-        {filtered.length === 0 && (
-          <Text style={styles.emptyText}>No saved venues match.</Text>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>

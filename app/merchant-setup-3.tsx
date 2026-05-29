@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,7 @@ import {
   type PartnerFanValue,
 } from '@/components/partner-fan-toggle';
 import { SectionHeader } from '@/components/section-header';
+import { useCreateMerchant } from '@/hooks/use-merchant-crud';
 import { merchantStorage } from '@/services/storage';
 import {
   useMerchantDraft,
@@ -35,6 +37,7 @@ const CATEGORY_META: Record<
 export default function MerchantSetup3Screen() {
   const router = useRouter();
   const draft = useMerchantDraft();
+  const createMerchant = useCreateMerchant();
   const [role, setRole] = useState<PartnerFanValue>('partners');
 
   const updateRole = (v: PartnerFanValue) => {
@@ -43,22 +46,41 @@ export default function MerchantSetup3Screen() {
   };
 
   const onSubmit = async () => {
-    await merchantStorage.save({
-      category: draft.category,
-      businessName: draft.businessName,
-      businessBio: draft.businessBio,
-      logoUri: draft.logoUri,
-      photos: draft.photos,
-      address: draft.address,
-      websiteUrl: draft.websiteUrl,
-      email: draft.email,
-      contactNumber: draft.contactNumber,
-      services: draft.services,
-    });
-    router.replace({
-      pathname: '/merchant-submitted',
-      params: { flow: 'partner' },
-    });
+    try {
+      await merchantStorage.save({
+        category: draft.category,
+        businessName: draft.businessName,
+        businessBio: draft.businessBio,
+        logoUri: draft.logoUri,
+        photos: draft.photos,
+        address: draft.address,
+        websiteUrl: draft.websiteUrl,
+        email: draft.email,
+        contactNumber: draft.contactNumber,
+        services: draft.services,
+      });
+      await createMerchant.mutateAsync({
+        businessName: draft.businessName,
+        description: draft.businessBio,
+        category: draft.category,
+        address: draft.address,
+        logo: draft.logoUri,
+        gallery: draft.photos,
+      });
+      router.replace({
+        pathname: '/merchant-submitted',
+        params: { flow: 'partner' },
+      });
+    } catch (e: any) {
+      Alert.alert(
+        'Submission failed',
+        e?.message ?? 'Saved locally — sync failed. Try again from edit screen.',
+      );
+      router.replace({
+        pathname: '/merchant-submitted',
+        params: { flow: 'partner' },
+      });
+    }
   };
 
   return (

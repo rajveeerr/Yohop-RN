@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MOCK_MENU_ITEMS } from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useMerchantMenu } from '@/hooks/use-merchant';
 import type { MenuItem } from '@/services/types';
 
 function formatPrice(n: number): string {
@@ -18,13 +19,19 @@ function formatPrice(n: number): string {
 
 export default function MerchantMenuScreen() {
   const router = useRouter();
+  const { data: me } = useMe();
+  const merchantId = me?.merchantId ?? undefined;
+  const { data: items, isLoading } = useMerchantMenu(merchantId);
 
-  const grouped = MOCK_MENU_ITEMS.reduce<Record<string, MenuItem[]>>((acc, it) => {
-    const key = it.category ?? 'Other';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(it);
-    return acc;
-  }, {});
+  const grouped = (items ?? []).reduce<Record<string, MenuItem[]>>(
+    (acc, it) => {
+      const key = it.category ?? 'Other';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(it);
+      return acc;
+    },
+    {},
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -42,6 +49,11 @@ export default function MerchantMenuScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
+        {isLoading && Object.keys(grouped).length === 0 ? (
+          <Text style={styles.empty}>Loading menu…</Text>
+        ) : Object.keys(grouped).length === 0 ? (
+          <Text style={styles.empty}>No menu items yet. Add one below.</Text>
+        ) : null}
         {Object.entries(grouped).map(([cat, items]) => (
           <View key={cat} style={{ marginBottom: 14 }}>
             <Text style={styles.catLabel}>{cat}</Text>
@@ -105,6 +117,12 @@ export default function MerchantMenuScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
+  empty: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 60,
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

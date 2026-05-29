@@ -14,7 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Line } from 'react-native-svg';
 import { useNearbyDeals } from '@/hooks/use-deals';
 import { useEvents } from '@/hooks/use-events';
 import { useLocation } from '@/hooks/use-location';
@@ -31,9 +33,13 @@ type FeedItem = {
   likes: string;
   off?: string;
   timer?: string;
+  startTime?: string | null;
+  endTime?: string | null;
   location: string;
   bounty: string;
   deal: string;
+  checkins: string[];
+  checkinCount: number;
   kind: 'deal' | 'event';
   raw: Deal | PlatformEvent;
 };
@@ -41,6 +47,15 @@ type FeedItem = {
 const PLACEHOLDER = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&q=80';
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80';
+
+// Faces shown in the "CHECKING IN" stack on live deals.
+const CHECKIN_AVATARS = [
+  'https://randomuser.me/api/portraits/women/44.jpg',
+  'https://randomuser.me/api/portraits/men/32.jpg',
+  'https://randomuser.me/api/portraits/women/68.jpg',
+  'https://randomuser.me/api/portraits/men/75.jpg',
+  'https://randomuser.me/api/portraits/women/12.jpg',
+];
 
 function formatNumber(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -55,6 +70,19 @@ function timeUntil(dateStr: string | null): string | undefined {
   const m = Math.floor((diff % 3_600_000) / 60_000);
   if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h ${m}m`;
   return `${h}h ${m}m`;
+}
+
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+/** Live mm:ss (or h:mm:ss) string for a remaining-seconds count. */
+function formatCountdown(totalSec: number): string {
+  const s = Math.max(0, totalSec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 }
 
 function dealToFeedItem(d: Deal): FeedItem {
@@ -74,9 +102,13 @@ function dealToFeedItem(d: Deal): FeedItem {
     likes: formatNumber(d.likeCount ?? 0),
     off: d.discountPercentage ? `${Math.round(d.discountPercentage)}% OFF` : undefined,
     timer: timeUntil(d.startTime),
+    startTime: d.startTime,
+    endTime: d.endTime,
     location: loc,
     bounty: d.isBounty && d.bountyReward ? `$${Math.round(d.bountyReward)}` : '',
     deal: d.description ?? d.title,
+    checkins: CHECKIN_AVATARS,
+    checkinCount: d.currentRedemptions ?? Math.max(0, Math.round((d.viewCount ?? 0) / 250)),
     raw: d,
   };
 }
@@ -101,6 +133,8 @@ function eventToFeedItem(e: PlatformEvent): FeedItem {
     location: loc,
     bounty: '',
     deal: 'See More',
+    checkins: [],
+    checkinCount: 0,
     raw: e,
   };
 }
@@ -124,8 +158,8 @@ const FALLBACK_DEALS: Deal[] = [
     description: 'Half-priced whiskey flights tonight only',
     discountPercentage: 50,
     discountAmount: null,
-    startTime: new Date(Date.now() + 2 * 3600_000).toISOString(),
-    endTime: new Date(Date.now() + 6 * 3600_000).toISOString(),
+    startTime: new Date(Date.now() - 6 * 60_000).toISOString(),
+    endTime: new Date(Date.now() + 54 * 60_000).toISOString(),
     images: [
       'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=1200&q=80',
       'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=1200&q=80',
@@ -156,8 +190,8 @@ const FALLBACK_DEALS: Deal[] = [
     description: 'Two-for-one pies all night long',
     discountPercentage: 30,
     discountAmount: null,
-    startTime: new Date(Date.now() + 3600_000).toISOString(),
-    endTime: new Date(Date.now() + 4 * 3600_000).toISOString(),
+    startTime: new Date(Date.now() - 15 * 60_000).toISOString(),
+    endTime: new Date(Date.now() + 30 * 60_000).toISOString(),
     images: [
       'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=1200&q=80',
       'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&q=80',
@@ -219,8 +253,8 @@ const FALLBACK_DEALS: Deal[] = [
     description: 'Five-course chef tasting menu',
     discountPercentage: 40,
     discountAmount: null,
-    startTime: new Date(Date.now() + 5 * 3600_000).toISOString(),
-    endTime: new Date(Date.now() + 9 * 3600_000).toISOString(),
+    startTime: new Date(Date.now() - 30 * 60_000).toISOString(),
+    endTime: new Date(Date.now() + 75 * 60_000).toISOString(),
     images: [
       'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=1200&q=80',
       'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&q=80',
@@ -465,6 +499,16 @@ function FeedCard({
   const router = useRouter();
   const [imageIndex, setImageIndex] = useState(0);
 
+  const nowMs = Date.now();
+  const startMs = item.startTime ? new Date(item.startTime).getTime() : null;
+  const endMs = item.endTime ? new Date(item.endTime).getTime() : null;
+  const isLive =
+    item.kind === 'deal' &&
+    startMs != null &&
+    endMs != null &&
+    startMs <= nowMs &&
+    endMs > nowMs;
+
   return (
     <View style={styles.card}>
       <FlatList
@@ -479,6 +523,12 @@ function FeedCard({
         renderItem={({ item: uri }) => (
           <RNImage source={{ uri }} style={styles.cardImage} resizeMode="cover" />
         )}
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0.85)']}
+        locations={[0, 0.55, 1]}
+        style={styles.bottomScrim}
+        pointerEvents="none"
       />
       <View style={styles.sideActions}>
         <TouchableOpacity style={styles.sideButton} onPress={onLike} activeOpacity={0.8}>
@@ -495,7 +545,7 @@ function FeedCard({
         </TouchableOpacity>
         <Text style={styles.sideLabel}>Share</Text>
 
-        {!!item.bounty && <BlinkingBounty bounty={item.bounty} />}
+        {!!item.bounty && !isLive && <BlinkingBounty bounty={item.bounty} />}
 
         <View style={styles.thumbWrap}>
           {!!item.off && (
@@ -516,11 +566,71 @@ function FeedCard({
         </View>
       </View>
 
+      {isLive && (
+        <View style={styles.countdownWrap} pointerEvents="none">
+          {!!item.bounty && <BountyTag bounty={item.bounty} />}
+          <CountdownGauge startTime={item.startTime!} endTime={item.endTime!} />
+          {item.checkins.length > 0 && <CheckinTag avatars={item.checkins} />}
+        </View>
+      )}
+
       <View style={styles.bottomWrap}>
         <View style={styles.bottomContent}>
-          <View style={styles.viewsRow}>
-            <Ionicons name="eye-outline" size={14} color="#fff" />
-            <Text style={styles.viewsText}>{item.views}</Text>
+          <View style={styles.titleRow}>
+            <View style={styles.avatar} />
+            <Text style={styles.title} numberOfLines={1}>
+              {item.title}
+            </Text>
+          </View>
+
+          <View style={styles.actionRow}>
+            <View style={styles.viewsChip}>
+              <Ionicons name="eye-outline" size={14} color="#fff" />
+              <Text style={styles.viewsText}>{item.views}</Text>
+            </View>
+            {item.off && (
+              <View style={styles.offBadge}>
+                <Text style={styles.offText}>{item.off}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.buyBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (item.kind === 'event') {
+                  router.push({ pathname: '/event', params: { id: item.id, title: item.title } });
+                } else {
+                  router.push({
+                    pathname: '/deal',
+                    params: { dealId: item.id, merchantId: (item.raw as Deal).merchantId },
+                  });
+                }
+              }}>
+              <Text style={styles.buyText}>{item.kind === 'event' ? 'View' : 'Buy'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bookBtn}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: '/book',
+                  params:
+                    item.kind === 'event'
+                      ? {
+                          type: 'event',
+                          eventId: item.id,
+                          title: item.title,
+                          image: item.images[0],
+                        }
+                      : {
+                          dealId: item.id,
+                          merchantId: (item.raw as Deal).merchantId,
+                          title: item.title,
+                        },
+                })
+              }>
+              <Text style={styles.bookText}>Book</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.followBtn, followed && styles.followBtnActive]}
               activeOpacity={0.8}
@@ -531,26 +641,12 @@ function FeedCard({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.titleRow}>
-            <View style={styles.avatar} />
-            <Text style={styles.title} numberOfLines={1}>
-              {item.title}
-            </Text>
-          </View>
-
-          {item.kind === 'deal' && (
+          {item.kind === 'deal' && item.timer && (
             <View style={styles.badgesRow}>
-              {item.off && (
-                <View style={styles.offBadge}>
-                  <Text style={styles.offText}>{item.off}</Text>
-                </View>
-              )}
-              {item.timer && (
-                <View style={styles.timerBadge}>
-                  <Ionicons name="time-outline" size={12} color="#2BB673" />
-                  <Text style={styles.timerText}>Begins : {item.timer}</Text>
-                </View>
-              )}
+              <View style={styles.timerBadge}>
+                <Ionicons name="time-outline" size={12} color="#2BB673" />
+                <Text style={styles.timerText}>Begins : {item.timer}</Text>
+              </View>
             </View>
           )}
 
@@ -585,53 +681,6 @@ function FeedCard({
               />
             ))}
           </View>
-        </View>
-
-        <View style={styles.bookBuy}>
-          <TouchableOpacity
-            style={styles.bookBtn}
-            activeOpacity={0.8}
-            onPress={() =>
-              router.push({
-                pathname: '/book',
-                params:
-                  item.kind === 'event'
-                    ? {
-                        type: 'event',
-                        eventId: item.id,
-                        title: item.title,
-                        image: item.images[0],
-                      }
-                    : {
-                        dealId: item.id,
-                        merchantId: (item.raw as Deal).merchantId,
-                        title: item.title,
-                      },
-              })
-            }>
-            <Text style={styles.bookText}>Book</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.buyBtn}
-            activeOpacity={0.8}
-            onPress={() => {
-              if (item.kind === 'event') {
-                router.push({
-                  pathname: '/event',
-                  params: { id: item.id, title: item.title },
-                });
-              } else {
-                router.push({
-                  pathname: '/deal',
-                  params: {
-                    dealId: item.id,
-                    merchantId: (item.raw as Deal).merchantId,
-                  },
-                });
-              }
-            }}>
-            <Text style={styles.buyText}>{item.kind === 'event' ? 'View' : 'Buy'}</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -670,6 +719,130 @@ function BlinkingBounty({ bounty }: { bounty: string }) {
   );
 }
 
+/** Bounty reward shown to the left of the live countdown gauge. */
+function BountyTag({ bounty }: { bounty: string }) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.55, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View style={[styles.bountyTag, { opacity }]}>
+      <Text style={styles.bountyTagValue}>{bounty}</Text>
+      <Text style={styles.bountyTagLabel}>BOUNTY</Text>
+    </Animated.View>
+  );
+}
+
+/** Stacked check-in avatars shown to the right of the live countdown gauge. */
+function CheckinTag({ avatars }: { avatars: string[] }) {
+  return (
+    <View style={styles.checkinTag}>
+      <View style={styles.avatarStack}>
+        {avatars.slice(0, 3).map((uri, i) => (
+          <RNImage
+            key={uri}
+            source={{ uri }}
+            style={[styles.checkinAvatar, i > 0 && { marginLeft: -12 }]}
+          />
+        ))}
+      </View>
+      <Text style={styles.checkinLabel}>CHECKING-IN</Text>
+    </View>
+  );
+}
+
+const GAUGE_W = 172;
+const GAUGE_H = 104;
+const GAUGE_CX = GAUGE_W / 2;
+const GAUGE_CY = 92; // baseline near the bottom so the dome sits on top
+const GAUGE_TICKS = 32;
+const GAUGE_OUTER_R = 76;
+const GAUGE_INNER_R = 64;
+const GAUGE_LIME = '#C4F27F';
+
+/**
+ * A live, depleting semicircular countdown gauge. Lit ticks recede from the
+ * right edge as time runs out; the mm:ss readout re-renders every second.
+ */
+function CountdownGauge({ startTime, endTime }: { startTime: string; endTime: string }) {
+  const startMs = useMemo(() => new Date(startTime).getTime(), [startTime]);
+  const endMs = useMemo(() => new Date(endTime).getTime(), [endTime]);
+  const totalMs = Math.max(1, endMs - startMs);
+  const totalMin = Math.max(1, Math.round(totalMs / 60_000));
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Gentle breathing pulse on the arc so it reads as "live" between ticks.
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] });
+
+  const remainingMs = Math.max(0, endMs - now);
+  const fraction = Math.max(0, Math.min(1, remainingMs / totalMs));
+  const remainingSec = Math.ceil(remainingMs / 1000);
+  const litCount = Math.round(fraction * GAUGE_TICKS);
+
+  const sweep = 180; // top half-circle
+  const startAngle = 180; // left, sweeping clockwise over the top to the right
+
+  const ticks = [];
+  for (let i = 0; i < GAUGE_TICKS; i++) {
+    const angle = ((startAngle + (sweep / (GAUGE_TICKS - 1)) * i) * Math.PI) / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const lit = i < litCount;
+    ticks.push(
+      <Line
+        key={i}
+        x1={GAUGE_CX + GAUGE_INNER_R * cos}
+        y1={GAUGE_CY + GAUGE_INNER_R * sin}
+        x2={GAUGE_CX + GAUGE_OUTER_R * cos}
+        y2={GAUGE_CY + GAUGE_OUTER_R * sin}
+        stroke={lit ? GAUGE_LIME : 'rgba(255,255,255,0.16)'}
+        strokeWidth={lit ? 3 : 2}
+        strokeLinecap="round"
+      />,
+    );
+  }
+
+  return (
+    <View style={styles.gaugeBox}>
+      <Animated.View style={{ opacity: ringOpacity }}>
+        <Svg width={GAUGE_W} height={GAUGE_H}>
+          {ticks}
+        </Svg>
+      </Animated.View>
+      <View style={styles.gaugeCenter} pointerEvents="none">
+        <Text style={styles.gaugeEndsIn}>ENDS IN</Text>
+        <Text style={styles.gaugeTime}>{formatCountdown(remainingSec)}</Text>
+        <Text style={styles.gaugeTotal}>of {totalMin} min</Text>
+      </View>
+    </View>
+  );
+}
+
 const DARK = 'rgba(0,0,0,0.55)';
 
 const styles = StyleSheet.create({
@@ -693,6 +866,13 @@ const styles = StyleSheet.create({
   cardImage: {
     width: SCREEN_W,
     height: SCREEN_H,
+  },
+  bottomScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SCREEN_H * 0.45,
   },
   topOverlay: {
     position: 'absolute',
@@ -823,30 +1003,126 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     width: 10,
   },
+  countdownWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: SCREEN_H * 0.30,
+    height: GAUGE_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bountyTag: {
+    position: 'absolute',
+    right: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  bountyTagValue: {
+    color: GAUGE_LIME,
+    fontSize: 28,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  bountyTagLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    marginTop: -2,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  checkinTag: {
+    position: 'absolute',
+    left: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkinLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginTop: 5,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  gaugeBox: {
+    width: GAUGE_W,
+    height: GAUGE_H,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gaugeCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 14,
+  },
+  gaugeEndsIn: {
+    color: GAUGE_LIME,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  gaugeTime: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  gaugeTotal: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 9,
+    fontWeight: '500',
+    letterSpacing: 1,
+    marginTop: 1,
+  },
   bottomWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 110,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
   },
-  bottomContent: { flex: 1 },
-  viewsRow: {
+  bottomContent: {},
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  viewsChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 6,
   },
   viewsText: { color: '#fff', fontSize: 12, marginRight: 8 },
   followBtn: {
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 2,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   followBtnActive: {
     backgroundColor: '#C4F27F',
@@ -854,6 +1130,18 @@ const styles = StyleSheet.create({
   },
   followText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   followTextActive: { color: '#000', fontWeight: '600' },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkinAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: '#333',
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -934,23 +1222,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     height: 3,
   },
-  bookBuy: {
-    gap: 8,
-    marginLeft: 8,
-    marginBottom: 4,
-  },
   bookBtn: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   bookText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   buyBtn: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   buyText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

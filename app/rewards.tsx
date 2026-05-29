@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -9,85 +9,65 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMe } from '@/hooks/use-auth';
+import {
+  useAchievementProgress,
+  useGamificationProfile,
+} from '@/hooks/use-gamification';
+import { useStreakRewards } from '@/hooks/use-streak';
+import {
+  useClaimVenueReward,
+  useNearbyVenueRewards,
+} from '@/hooks/use-venue-rewards';
+import { useLocation } from '@/hooks/use-location';
+import { useProfileStats } from '@/hooks/use-profile';
+import type { Achievement, VenueReward } from '@/services/types';
 
 type Tab = 'rewards' | 'badges';
 
-type Reward = {
-  id: string;
-  title: string;
-  meta: string;
-  cost: number;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconBg: string;
-  iconColor: string;
-  state: 'redeem' | 'joined' | 'locked' | 'used';
+const TIER_GOALS: Record<string, number> = {
+  BRONZE: 1000,
+  SILVER: 2500,
+  GOLD: 5000,
+  PLATINUM: 10000,
+  DIAMOND: 25000,
 };
 
-const REWARDS: Reward[] = [
-  {
-    id: '1',
-    title: 'Free Cocktail',
-    meta: 'Haus Khas Social · valid today',
-    cost: 200,
-    icon: 'wine-outline',
-    iconBg: 'rgba(196,242,127,0.18)',
-    iconColor: '#C4F27F',
-    state: 'redeem',
-  },
-  {
-    id: '2',
-    title: '50 Bounty Points',
-    meta: 'Active · 2 friends joined',
-    cost: 0,
-    icon: 'sparkles-outline',
-    iconBg: 'rgba(255,179,0,0.18)',
-    iconColor: '#FFB300',
-    state: 'joined',
-  },
-  {
-    id: '3',
-    title: '20% Off Next Visit',
-    meta: 'Across 40+ venues',
-    cost: 250,
-    icon: 'pricetag-outline',
-    iconBg: 'rgba(174,128,255,0.22)',
-    iconColor: '#AE80FF',
-    state: 'redeem',
-  },
-  {
-    id: '4',
-    title: 'Priority Booking',
-    meta: 'Skip the wait once',
-    cost: 400,
-    icon: 'flash-outline',
-    iconBg: 'rgba(196,242,127,0.18)',
-    iconColor: '#C4F27F',
-    state: 'redeem',
-  },
-];
-
-type Badge = {
-  id: string;
-  title: string;
-  meta: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  earned: boolean;
-};
-
-const BADGES: Badge[] = [
-  { id: '1', title: 'Hot Streak', meta: '7 days in a row', icon: 'flame', earned: true },
-  { id: '2', title: 'Explorer', meta: '10 venues visited', icon: 'compass', earned: true },
-  { id: '3', title: 'Top 10', meta: 'Reach top 10 this month', icon: 'trophy', earned: false },
-  { id: '4', title: 'Legend', meta: 'Hit Level 5', icon: 'medal', earned: false },
-];
+function tierIconBg(idx: number) {
+  const palette = [
+    { bg: 'rgba(196,242,127,0.18)', fg: '#C4F27F', icon: 'wine-outline' as const },
+    { bg: 'rgba(255,179,0,0.18)', fg: '#FFB300', icon: 'sparkles-outline' as const },
+    { bg: 'rgba(174,128,255,0.22)', fg: '#AE80FF', icon: 'pricetag-outline' as const },
+    { bg: 'rgba(196,242,127,0.18)', fg: '#C4F27F', icon: 'flash-outline' as const },
+  ];
+  return palette[idx % palette.length];
+}
 
 export default function RewardsScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('rewards');
+  const { data: me } = useMe();
+  const { data: stats } = useProfileStats();
+  const { data: gam } = useGamificationProfile();
+  const { data: streakRewards } = useStreakRewards();
+  const { data: achievements, isLoading: achLoading } = useAchievementProgress();
+  const { location } = useLocation();
+  const { data: nearbyRewards } = useNearbyVenueRewards({
+    latitude: location.latitude,
+    longitude: location.longitude,
+  });
+  const claim = useClaimVenueReward();
 
-  const totalPoints = 2400;
-  const goal = 5000;
+  const totalPoints = stats?.points ?? me?.points ?? 0;
+  const tier = gam?.loyaltyTier ?? me?.loyaltyTier ?? 'BRONZE';
+  const goal = gam?.nextTierAt ?? TIER_GOALS[tier] ?? 5000;
   const pct = Math.min(100, (totalPoints / goal) * 100);
+  const nextTierLabel = gam?.nextTier ?? nextTierFrom(tier);
+
+  const claimableStreak = useMemo(
+    () => (streakRewards ?? []).filter((r) => !r.claimed),
+    [streakRewards],
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -107,14 +87,12 @@ export default function RewardsScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.totalValue}>
-              {totalPoints.toLocaleString()}
-            </Text>
+            <Text style={styles.totalValue}>{totalPoints.toLocaleString()}</Text>
             <Text style={styles.totalLabel}>TOTAL POINTS</Text>
           </View>
           <View style={styles.proBadge}>
             <Ionicons name="diamond" size={10} color="#C4F27F" />
-            <Text style={styles.proBadgeText}>Pro Member</Text>
+            <Text style={styles.proBadgeText}>{tier} Member</Text>
           </View>
         </View>
 
@@ -126,7 +104,7 @@ export default function RewardsScreen() {
             {totalPoints.toLocaleString()} pts
           </Text>
           <Text style={styles.progressLabel}>
-            Gold at {goal.toLocaleString()} pts
+            {nextTierLabel ? `${nextTierLabel} at ${goal.toLocaleString()} pts` : 'Max tier'}
           </Text>
         </View>
 
@@ -153,77 +131,152 @@ export default function RewardsScreen() {
 
         {tab === 'rewards' && (
           <View style={{ gap: 10 }}>
-            {REWARDS.map((r) => (
-              <View key={r.id} style={styles.rewardCard}>
-                <View style={[styles.rewardIcon, { backgroundColor: r.iconBg }]}>
-                  <Ionicons name={r.icon} size={18} color={r.iconColor} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rewardTitle}>{r.title}</Text>
-                  <Text style={styles.rewardMeta}>{r.meta}</Text>
-                  {r.cost > 0 ? (
-                    <Text style={styles.rewardCost}>{r.cost} pts</Text>
-                  ) : null}
-                </View>
-                {r.state === 'redeem' && (
-                  <TouchableOpacity style={styles.redeemBtn} activeOpacity={0.85}>
-                    <Text style={styles.redeemText}>Redeem</Text>
-                  </TouchableOpacity>
-                )}
-                {r.state === 'joined' && (
-                  <View style={styles.joinedPill}>
-                    <Text style={styles.joinedText}>Joined</Text>
+            {claimableStreak.map((sr, idx) => {
+              const meta = tierIconBg(idx);
+              return (
+                <View key={sr.id} style={styles.rewardCard}>
+                  <View style={[styles.rewardIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name="flame-outline" size={18} color={meta.fg} />
                   </View>
-                )}
-              </View>
-            ))}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rewardTitle}>
+                      {sr.rewardType === 'COINS'
+                        ? `${sr.value} bonus coins`
+                        : sr.rewardType === 'DISCOUNT'
+                        ? `${sr.value}% off next visit`
+                        : `${sr.rewardType} reward`}
+                    </Text>
+                    <Text style={styles.rewardMeta}>
+                      {sr.milestoneDays}-day streak
+                    </Text>
+                  </View>
+                  <View style={styles.joinedPill}>
+                    <Text style={styles.joinedText}>Earned</Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {(nearbyRewards ?? []).map((r: VenueReward, idx) => {
+              const meta = tierIconBg(idx + claimableStreak.length);
+              return (
+                <View key={r.id} style={styles.rewardCard}>
+                  <View style={[styles.rewardIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon} size={18} color={meta.fg} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rewardTitle}>{r.name}</Text>
+                    <Text style={styles.rewardMeta}>
+                      {r.merchant?.businessName ?? r.description ?? 'Nearby venue'}
+                    </Text>
+                    <Text style={styles.rewardCost}>
+                      {r.type === 'COINS'
+                        ? `+${r.amount} coins`
+                        : r.type === 'DISCOUNT'
+                        ? `${r.amount}% off`
+                        : `${r.amount} reward`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.redeemBtn}
+                    activeOpacity={0.85}
+                    disabled={claim.isPending}
+                    onPress={() => claim.mutate(r.id)}>
+                    <Text style={styles.redeemText}>Claim</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            {claimableStreak.length === 0 &&
+              (nearbyRewards ?? []).length === 0 && (
+                <Text style={styles.empty}>
+                  No rewards nearby — check in at venues to unlock more.
+                </Text>
+              )}
           </View>
         )}
 
-        {tab === 'rewards' && <Text style={styles.badgesHeader}>BADGES EARNED</Text>}
+        {tab === 'rewards' && (
+          <Text style={styles.badgesHeader}>BADGES EARNED</Text>
+        )}
 
         {(tab === 'badges' || tab === 'rewards') && (
-          <View style={styles.badgeGrid}>
-            {BADGES.map((b) => (
-              <View
-                key={b.id}
-                style={[styles.badgeCard, !b.earned && styles.badgeCardLocked]}>
-                <View
-                  style={[
-                    styles.badgeIcon,
-                    !b.earned && styles.badgeIconLocked,
-                  ]}>
-                  <Ionicons
-                    name={b.icon}
-                    size={22}
-                    color={b.earned ? '#C4F27F' : 'rgba(255,255,255,0.35)'}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.badgeTitle,
-                    !b.earned && { color: 'rgba(255,255,255,0.4)' },
-                  ]}>
-                  {b.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.badgeMeta,
-                    !b.earned && { color: 'rgba(255,255,255,0.3)' },
-                  ]}>
-                  {b.meta}
-                </Text>
-                {!b.earned && (
-                  <View style={styles.lockIcon}>
-                    <Ionicons name="lock-closed" size={10} color="rgba(255,255,255,0.4)" />
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
+          <BadgeGrid
+            items={achievements ?? []}
+            loading={achLoading}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function nextTierFrom(tier: string): string | null {
+  const order = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'];
+  const idx = order.indexOf(tier);
+  if (idx < 0 || idx === order.length - 1) return null;
+  return order[idx + 1];
+}
+
+function BadgeGrid({
+  items,
+  loading,
+}: {
+  items: { achievement: Achievement; completedAt: string | null; progress: number; total: number }[];
+  loading: boolean;
+}) {
+  if (loading && items.length === 0) {
+    return <Text style={styles.empty}>Loading badges…</Text>;
+  }
+  if (items.length === 0) {
+    return <Text style={styles.empty}>No badges yet.</Text>;
+  }
+  return (
+    <View style={styles.badgeGrid}>
+      {items.map((it) => {
+        const earned = !!it.completedAt;
+        return (
+          <View
+            key={it.achievement.id}
+            style={[styles.badgeCard, !earned && styles.badgeCardLocked]}>
+            <View
+              style={[styles.badgeIcon, !earned && styles.badgeIconLocked]}>
+              <Ionicons
+                name="trophy"
+                size={22}
+                color={earned ? '#C4F27F' : 'rgba(255,255,255,0.35)'}
+              />
+            </View>
+            <Text
+              style={[
+                styles.badgeTitle,
+                !earned && { color: 'rgba(255,255,255,0.4)' },
+              ]}>
+              {it.achievement.name}
+            </Text>
+            <Text
+              style={[
+                styles.badgeMeta,
+                !earned && { color: 'rgba(255,255,255,0.3)' },
+              ]}>
+              {earned
+                ? it.achievement.description
+                : `${it.progress}/${it.total}`}
+            </Text>
+            {!earned && (
+              <View style={styles.lockIcon}>
+                <Ionicons
+                  name="lock-closed"
+                  size={10}
+                  color="rgba(255,255,255,0.4)"
+                />
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -440,5 +493,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  empty: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 30,
+    width: '100%',
   },
 });

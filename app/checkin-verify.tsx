@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FakeQR } from '@/components/fake-qr';
+import { useEventCheckIn, useUserCheckIn } from '@/hooks/use-checkin';
+import { useEvent } from '@/hooks/use-events';
+import { useLocation } from '@/hooks/use-location';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = SCREEN_W - 36;
@@ -21,13 +25,60 @@ export default function CheckinVerifyScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     eventId?: string;
+    merchantId?: string;
     title?: string;
     tickets?: string;
   }>();
   const ticketsCount = Math.max(1, Number(params.tickets || '1'));
-  const title = params.title || 'Sabrina Carpenter';
+  const title = params.title || 'Check-in';
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
+  const { location } = useLocation();
+  const { data: event } = useEvent(params.eventId);
+  const eventCheckIn = useEventCheckIn(params.eventId);
+  const userCheckIn = useUserCheckIn();
+  const busy = eventCheckIn.isPending || userCheckIn.isPending;
+
+  const onCheckIn = async () => {
+    try {
+      if (params.eventId) {
+        await eventCheckIn.mutateAsync({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+      } else if (params.merchantId) {
+        await userCheckIn.mutateAsync({
+          merchantId: params.merchantId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+      }
+      router.push({
+        pathname: '/checkin-complete',
+        params: {
+          eventId: params.eventId ?? '',
+          title,
+          tickets: String(ticketsCount),
+        },
+      });
+    } catch (e: any) {
+      Alert.alert('Check-in failed', e?.message ?? 'Please try again.');
+    }
+  };
+
+  const dateLabel = event?.startDate
+    ? new Date(event.startDate).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+      })
+    : '—';
+  const timeLabel = event?.startDate
+    ? new Date(event.startDate).toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '—';
+  const venueLabel = event?.venue ?? '—';
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(e.nativeEvent.contentOffset.x / CARD_W);
@@ -97,30 +148,22 @@ export default function CheckinVerifyScreen() {
 
         <View style={styles.detailsCard}>
           <Row label="Event" value={title} />
-          <Row label="Date" value="12th April" />
-          <Row label="Time" value="6:00 PM" />
-          <Row label="Ticket" value="Gold — Weekend Offer" />
-          <Row label="Seat" value="Standing mid floor" />
-          <Row label="Gate" value="Gate B" highlight />
+          <Row label="Date" value={dateLabel} />
+          <Row label="Time" value={timeLabel} />
+          <Row label="Venue" value={venueLabel} highlight />
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.ctaBtn}
+          style={[styles.ctaBtn, busy && { opacity: 0.6 }]}
           activeOpacity={0.85}
-          onPress={() =>
-            router.push({
-              pathname: '/checkin-complete',
-              params: {
-                eventId: params.eventId ?? '',
-                title,
-                tickets: String(ticketsCount),
-              },
-            })
-          }>
+          disabled={busy}
+          onPress={onCheckIn}>
           <Ionicons name="finger-print" size={14} color="#000" />
-          <Text style={styles.ctaText}>Check-in Now</Text>
+          <Text style={styles.ctaText}>
+            {busy ? 'Checking in…' : 'Check-in Now'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

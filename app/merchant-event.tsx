@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -14,8 +15,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
-import { MOCK_EVENTS } from '@/constants/merchant-mock';
-import type { EventType } from '@/services/types';
+import { useCreateEvent, useUpdateEvent } from '@/hooks/use-event-crud';
+import { useEvent } from '@/hooks/use-events';
+import { apiPost, unwrap } from '@/services/api';
+import type { EventType, PlatformEvent } from '@/services/types';
 
 const EVENT_TYPES: { key: EventType; label: string }[] = [
   { key: 'PARTY', label: 'Party' },
@@ -31,11 +34,10 @@ type TierDraft = { name: string; price: string; quantity: string };
 export default function MerchantEventEditor() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-
-  const existing = useMemo(
-    () => (id ? MOCK_EVENTS.find((e) => e.id === id) : undefined),
-    [id],
-  );
+  const { data: existing } = useEvent(id);
+  const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent();
+  const saving = createEvent.isPending || updateEvent.isPending;
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [type, setType] = useState<EventType>(existing?.type ?? 'PARTY');
@@ -65,6 +67,45 @@ export default function MerchantEventEditor() {
     setTiers((prev) => [...prev, { name: '', price: '', quantity: '' }]);
   const removeTier = (i: number) =>
     setTiers((prev) => prev.filter((_, idx) => idx !== i));
+
+  const buildPayload = (publish: boolean): Partial<PlatformEvent> => ({
+    title,
+    type,
+    status: publish ? 'PUBLISHED' : 'DRAFT',
+    venue: venue || null,
+    address: address || null,
+    startDate: parseDateInput(startDate),
+    endDate: parseDateInput(endDate),
+    capacity: capacity ? Number(capacity) : null,
+    description: description || null,
+  });
+
+  const onSave = async (publish: boolean) => {
+    try {
+      const payload = buildPayload(publish);
+      let eventId = id;
+      if (id) {
+        await updateEvent.mutateAsync({ eventId: id, ...payload });
+      } else {
+        const created = await createEvent.mutateAsync(payload);
+        eventId = created.id;
+      }
+      if (publish && eventId) {
+        for (const t of tiers.filter((t) => t.name && t.price)) {
+          await unwrap(
+            apiPost(`/events/${eventId}/tickets`, {
+              name: t.name,
+              price: Number(t.price),
+              quantity: t.quantity ? Number(t.quantity) : 0,
+            }),
+          );
+        }
+      }
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.message ?? 'Please try again.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -241,16 +282,24 @@ export default function MerchantEventEditor() {
           <TouchableOpacity
             style={styles.draftBtn}
             activeOpacity={0.85}
-            onPress={() => router.back()}>
+            disabled={saving}
+            onPress={() => onSave(false)}>
             <Text style={styles.draftText}>Save Draft</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            style={[
+              styles.saveBtn,
+              (!canSave || saving) && styles.saveBtnDisabled,
+            ]}
             activeOpacity={0.85}
-            disabled={!canSave}
-            onPress={() => router.back()}>
+            disabled={!canSave || saving}
+            onPress={() => onSave(true)}>
             <Text style={styles.saveText}>
-              {existing ? 'Save changes' : 'Publish Event'}
+              {saving
+                ? 'Saving…'
+                : existing
+                ? 'Save changes'
+                : 'Publish Event'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -293,6 +342,14 @@ function Field({
       />
     </View>
   );
+}
+
+function parseDateInput(s: string): string {
+  if (!s) return new Date().toISOString();
+  const normalized = s.replace(' ', 'T');
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
 }
 
 const styles = StyleSheet.create({

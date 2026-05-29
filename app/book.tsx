@@ -2,6 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   ImageBackground,
   Modal,
   Pressable,
@@ -13,6 +14,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRegisterForEvent } from '@/hooks/use-event-register';
+import { useBookTable } from '@/hooks/use-table-booking';
 
 const DATE_OPTIONS = ['10 Apr', '11 Apr', '12 Apr', '13 Apr', '14 Apr', '15 Apr'];
 const TIME_OPTIONS = ['5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM'];
@@ -41,18 +44,23 @@ export default function BookScreen() {
     type?: string;
     title?: string;
     image?: string;
+    merchantId?: string;
+    eventId?: string;
   }>();
   const isEvent = params.type === 'event';
   const HERO = isEvent ? params.image || EVENT_HERO : VENUE_HERO;
   const TABS = isEvent ? EVENT_TABS : VENUE_TABS;
   const SEATS = isEvent ? EVENT_SEATS : VENUE_SEATS;
-  const title = params.title || (isEvent ? 'Sabrina Carpenter' : 'Premium Omakase Experience');
+  const title = params.title || (isEvent ? 'Event' : 'Booking');
   const [tab, setTab] = useState(TABS[0]);
   const [tableCount, setTableCount] = useState(2);
   const [addedSeats, setAddedSeats] = useState<Record<string, boolean>>({});
   const [date, setDate] = useState('12 Apr');
   const [time, setTime] = useState('6:00 PM');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const bookTable = useBookTable();
+  const registerEvent = useRegisterForEvent(params.eventId);
+  const busy = bookTable.isPending || registerEvent.isPending;
 
   const toggleSeat = (id: string) =>
     setAddedSeats((s) => ({ ...s, [id]: !s[id] }));
@@ -62,6 +70,46 @@ export default function BookScreen() {
     0,
   );
   const hasItems = subtotal > 0;
+
+  const onConfirmBooking = async () => {
+    try {
+      if (isEvent && params.eventId) {
+        const result = await registerEvent.mutateAsync({
+          quantity: tableCount,
+        });
+        router.replace({
+          pathname: '/booked',
+          params: {
+            title,
+            type: 'event',
+            confirmationCode: result.confirmationCode ?? '',
+          },
+        });
+        return;
+      }
+      if (!isEvent && params.merchantId) {
+        const isoDate = parseRelativeDate(date);
+        const result = await bookTable.mutateAsync({
+          merchantId: params.merchantId,
+          date: isoDate,
+          time,
+          partySize: tableCount,
+        });
+        router.replace({
+          pathname: '/booked',
+          params: {
+            title,
+            type: 'table',
+            confirmationCode: result.confirmationCode,
+          },
+        });
+        return;
+      }
+      router.push('/details');
+    } catch (e: any) {
+      Alert.alert('Booking failed', e?.message ?? 'Please try again.');
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -200,9 +248,10 @@ export default function BookScreen() {
             )}
             <View style={styles.bottomBar}>
               <TouchableOpacity
-                style={styles.bottomBtn}
+                style={[styles.bottomBtn, busy && { opacity: 0.6 }]}
                 activeOpacity={0.85}
-                onPress={() => router.push('/details')}>
+                disabled={busy}
+                onPress={onConfirmBooking}>
                 {isEvent ? (
                   <Ionicons name="ticket-outline" size={16} color="#fff" />
                 ) : (
@@ -213,13 +262,27 @@ export default function BookScreen() {
                   />
                 )}
                 <Text style={styles.bottomBtnText}>
-                  {isEvent ? 'Book a ticket' : 'Book a table'}
+                  {busy
+                    ? 'Booking…'
+                    : isEvent
+                    ? 'Book a ticket'
+                    : 'Book a table'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.bottomBtn}
                 activeOpacity={0.85}
-                onPress={() => router.push('/booked')}>
+                onPress={() =>
+                  router.push({
+                    pathname: '/checkin',
+                    params: {
+                      eventId: params.eventId ?? '',
+                      merchantId: params.merchantId ?? '',
+                      title,
+                      tickets: String(tableCount),
+                    },
+                  })
+                }>
                 <Ionicons name="finger-print" size={16} color="#fff" />
                 <Text style={styles.bottomBtnText}>Check-in Now</Text>
               </TouchableOpacity>
@@ -325,6 +388,22 @@ export default function BookScreen() {
       </ImageBackground>
     </View>
   );
+}
+
+function parseRelativeDate(label: string): string {
+  const match = label.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
+  if (!match) return new Date().toISOString().split('T')[0];
+  const day = Number(match[1]);
+  const monthName = match[2].slice(0, 3).toLowerCase();
+  const months: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+  const month = months[monthName];
+  if (month === undefined) return new Date().toISOString().split('T')[0];
+  const year = new Date().getFullYear();
+  const d = new Date(Date.UTC(year, month, day));
+  return d.toISOString().split('T')[0];
 }
 
 const styles = StyleSheet.create({

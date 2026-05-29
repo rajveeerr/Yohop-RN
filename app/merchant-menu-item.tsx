@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,17 +16,30 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
-import { MOCK_MENU_ITEMS } from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useMerchantMenu } from '@/hooks/use-merchant';
+import {
+  useCreateMenuItem,
+  useDeleteMenuItem,
+  useUpdateMenuItem,
+} from '@/hooks/use-merchant-crud';
 
 const CATEGORIES = ['Starters', 'Mains', 'Desserts', 'Cocktails', 'Tasting'];
 
 export default function MerchantMenuItemEditor() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { data: me } = useMe();
+  const merchantId = me?.merchantId ?? undefined;
+  const { data: menu } = useMerchantMenu(merchantId);
   const existing = useMemo(
-    () => (id ? MOCK_MENU_ITEMS.find((m) => m.id === id) : undefined),
-    [id],
+    () => (id ? menu?.find((m) => m.id === id) : undefined),
+    [id, menu],
   );
+  const createItem = useCreateMenuItem(merchantId);
+  const updateItem = useUpdateMenuItem(merchantId);
+  const deleteItem = useDeleteMenuItem(merchantId);
+  const saving = createItem.isPending || updateItem.isPending;
 
   const [name, setName] = useState(existing?.name ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
@@ -35,7 +49,52 @@ export default function MerchantMenuItemEditor() {
   const [isHappyHour, setIsHappyHour] = useState(existing?.isHappyHour ?? false);
   const [isSurprise, setIsSurprise] = useState(existing?.isSurprise ?? false);
 
-  const canSave = name.trim().length > 0 && Number(price) > 0;
+  const canSave = name.trim().length > 0 && Number(price) > 0 && !!merchantId;
+
+  const onSave = async () => {
+    if (!merchantId) {
+      Alert.alert('Not a merchant', 'Complete merchant onboarding first.');
+      return;
+    }
+    try {
+      const payload = {
+        name,
+        description: description || null,
+        price: Number(price),
+        category,
+        isAvailable,
+        isHappyHour,
+        isSurprise,
+      };
+      if (id) {
+        await updateItem.mutateAsync({ itemId: id, ...payload });
+      } else {
+        await createItem.mutateAsync(payload);
+      }
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.message ?? 'Please try again.');
+    }
+  };
+
+  const onDelete = () => {
+    if (!id) return;
+    Alert.alert('Delete item?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteItem.mutateAsync(id);
+            router.back();
+          } catch (e: any) {
+            Alert.alert('Delete failed', e?.message ?? 'Please try again.');
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -154,17 +213,27 @@ export default function MerchantMenuItemEditor() {
 
         <View style={styles.footer}>
           {existing && (
-            <TouchableOpacity style={styles.dangerBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.dangerBtn}
+              activeOpacity={0.85}
+              onPress={onDelete}>
               <Ionicons name="trash-outline" size={16} color="#E53935" />
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+            style={[
+              styles.saveBtn,
+              (!canSave || saving) && styles.saveBtnDisabled,
+            ]}
             activeOpacity={0.85}
-            disabled={!canSave}
-            onPress={() => router.back()}>
+            disabled={!canSave || saving}
+            onPress={onSave}>
             <Text style={styles.saveText}>
-              {existing ? 'Save changes' : 'Add to menu'}
+              {saving
+                ? 'Saving…'
+                : existing
+                ? 'Save changes'
+                : 'Add to menu'}
             </Text>
           </TouchableOpacity>
         </View>

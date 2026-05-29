@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserDrawer } from '@/components/user-drawer';
 import { useMe } from '@/hooks/use-auth';
 import { useActivity } from '@/hooks/use-bookings';
+import { useAchievementProgress } from '@/hooks/use-gamification';
 import { useMyRank } from '@/hooks/use-leaderboard';
 import { useProfileStats } from '@/hooks/use-profile';
 import { useRouter } from 'expo-router';
@@ -260,79 +261,46 @@ function ViewTab({
   );
 }
 
-type Badge = {
-  id: string;
-  title: string;
-  sub: string;
-  emoji: string;
-  earnedOn?: string;
-  progress?: { done: number; total: number };
-};
-const BADGES: Badge[] = [
-  {
-    id: '1',
-    title: '7-day streak',
-    sub: 'Checked in 7 days in a row',
-    emoji: '🔥',
-    earnedOn: '12 Apr',
-  },
-  {
-    id: '2',
-    title: 'Foodie First',
-    sub: 'Booked 10+ restaurant tables',
-    emoji: '🍽️',
-    earnedOn: '2 Apr',
-  },
-  {
-    id: '3',
-    title: '7-day streak',
-    sub: 'Checked in 7 days in a row',
-    emoji: '🔥',
-    progress: { done: 3, total: 5 },
-  },
-  {
-    id: '4',
-    title: 'Foodie First',
-    sub: 'Booked 10+ restaurant tables',
-    emoji: '🍽️',
-    progress: { done: 2, total: 3 },
-  },
-  {
-    id: '5',
-    title: '7-day streak',
-    sub: 'Checked in 7 days in a row',
-    emoji: '🔥',
-    progress: { done: 1, total: 5 },
-  },
-  {
-    id: '6',
-    title: 'Foodie First',
-    sub: 'Booked 10+ restaurant tables',
-    emoji: '🍽️',
-    progress: { done: 0, total: 3 },
-  },
-];
+function formatEarnedDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 function StarredView() {
+  const { data: achievements, isLoading } = useAchievementProgress();
+  const items = achievements ?? [];
+
+  if (isLoading && items.length === 0) {
+    return <Text style={styles.emptyListText}>Loading badges…</Text>;
+  }
+  if (items.length === 0) {
+    return <Text style={styles.emptyListText}>No badges yet</Text>;
+  }
+
   return (
     <View style={styles.badgeGrid}>
-      {BADGES.map((b) => (
-        <View key={b.id} style={styles.badgeCard}>
-          <Text style={styles.badgeEmoji}>{b.emoji}</Text>
-          <Text style={styles.badgeTitle}>{b.title}</Text>
-          <Text style={styles.badgeSub}>{b.sub}</Text>
-          {b.earnedOn ? (
-            <View style={styles.badgeStatusRow}>
-              <Ionicons name="checkmark-circle" size={12} color="#C4F27F" />
-              <Text style={styles.badgeEarned}>Earned {b.earnedOn}</Text>
-            </View>
-          ) : b.progress ? (
-            <Text style={styles.badgeProgress}>
-              {b.progress.done} of {b.progress.total} done
-            </Text>
-          ) : null}
-        </View>
-      ))}
+      {items.map((a) => {
+        const earned = !!a.completedAt;
+        return (
+          <View key={a.achievementId} style={styles.badgeCard}>
+            <Text style={styles.badgeEmoji}>🏆</Text>
+            <Text style={styles.badgeTitle}>{a.achievement.name}</Text>
+            <Text style={styles.badgeSub}>{a.achievement.description}</Text>
+            {earned ? (
+              <View style={styles.badgeStatusRow}>
+                <Ionicons name="checkmark-circle" size={12} color="#C4F27F" />
+                <Text style={styles.badgeEarned}>
+                  Earned {formatEarnedDate(a.completedAt!)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.badgeProgress}>
+                {a.progress} of {a.total} done
+              </Text>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }

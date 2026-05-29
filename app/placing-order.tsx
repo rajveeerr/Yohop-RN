@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCapturePayment } from '@/hooks/use-payments';
 
 const STEPS: { title: string; sub?: string }[] = [
   { title: 'Home', sub: 'door' },
@@ -18,8 +19,25 @@ const STEPS: { title: string; sub?: string }[] = [
 
 export default function PlacingOrderScreen() {
   const router = useRouter();
-  const { amount } = useLocalSearchParams<{ amount?: string }>();
+  const params = useLocalSearchParams<{
+    amount?: string;
+    orderId?: string;
+    paymentId?: string;
+  }>();
+  const amount = params.amount;
   const [done, setDone] = useState(0);
+  const capture = useCapturePayment();
+  const captureFired = useRef(false);
+
+  useEffect(() => {
+    if (params.orderId && !captureFired.current) {
+      captureFired.current = true;
+      capture.mutate({
+        orderId: params.orderId,
+        paymentId: params.paymentId || undefined,
+      });
+    }
+  }, [params.orderId, params.paymentId, capture]);
 
   useEffect(() => {
     if (done >= STEPS.length) {

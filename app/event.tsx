@@ -10,90 +10,58 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvent } from '@/hooks/use-events';
 
 type Tab = 'tickets' | 'overview' | 'lineup' | 'merch';
 
-type TicketTier = {
-  id: string;
-  name: string;
-  price: string;
-  perks: string[];
-  available: boolean;
-};
-
-const TICKETS: TicketTier[] = [
-  {
-    id: 'silver',
-    name: 'Silver — Weekend Offer',
-    price: '$120',
-    perks: ['Standing access', 'Welcome drink', 'Locker access'],
-    available: true,
-  },
-  {
-    id: 'gold',
-    name: 'Gold — Weekend Offer',
-    price: '$210',
-    perks: ['Mid floor standing', 'Fast lane entry', '2 drink coupons'],
-    available: true,
-  },
-  {
-    id: 'platinum',
-    name: 'Platinum — Weekend Offer',
-    price: '$340',
-    perks: ['Seated section', 'Backstage tour', 'Meet & greet pass'],
-    available: true,
-  },
-];
-
-type Performer = {
-  id: string;
-  name: string;
-  role: string;
-  start: string;
-  end: string;
-  color: string;
-};
-
-const PERFORMERS: Performer[] = [
-  {
-    id: '1',
-    name: 'Sabrina Carpenter',
-    role: 'Headliner',
-    start: '8:00 PM',
-    end: '10:00 PM',
-    color: '#C4F27F',
-  },
-  {
-    id: '2',
-    name: 'Olivia Dean',
-    role: 'Supporting',
-    start: '6:45 PM',
-    end: '7:30 PM',
-    color: '#AE80FF',
-  },
-  {
-    id: '3',
-    name: 'Jordan Carter',
-    role: 'Opening act',
-    start: '6:00 PM',
-    end: '6:40 PM',
-    color: '#FFB300',
-  },
-];
-
-const HERO =
+const HERO_FALLBACK =
   'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=900&q=80';
+
+function formatPrice(n: number): string {
+  return `$${n.toFixed(n % 1 === 0 ? 0 : 2)}`;
+}
+
+function formatEventDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }) + ', ' + d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
 export default function EventScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [tab, setTab] = useState<Tab>('tickets');
   const [tickets, setTickets] = useState(2);
+  const { data: event, isLoading } = useEvent(id);
+
+  const hero = event?.coverImage ?? event?.images?.[0] ?? HERO_FALLBACK;
+  const title = event?.title ?? (isLoading ? 'Loading…' : 'Event');
+  const dateMeta = event?.startDate ? formatEventDate(event.startDate) : '';
+  const locationMeta = [event?.venue, event?.city]
+    .filter((x): x is string => !!x)
+    .join(' · ');
+  const ticketTiers = event?.ticketTiers ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.hero}>
-        <Image source={{ uri: HERO }} style={styles.heroImg} />
+        <Image source={{ uri: hero }} style={styles.heroImg} />
         <View style={styles.heroOverlay} />
         <View style={styles.heroTopRow}>
           <TouchableOpacity
@@ -113,14 +81,14 @@ export default function EventScreen() {
         </View>
 
         <View style={styles.heroBottom}>
-          <Text style={styles.eventTitle}>Sabrina Carpenter</Text>
-          <Text style={styles.eventMeta}>Sun, 12 Apr, 6:00 PM</Text>
-          <View style={styles.metaDotRow}>
-            <View style={styles.greenDot} />
-            <Text style={styles.eventDistance}>
-              20 miles away · East Wing-Atlanta
-            </Text>
-          </View>
+          <Text style={styles.eventTitle}>{title}</Text>
+          {dateMeta ? <Text style={styles.eventMeta}>{dateMeta}</Text> : null}
+          {locationMeta ? (
+            <View style={styles.metaDotRow}>
+              <View style={styles.greenDot} />
+              <Text style={styles.eventDistance}>{locationMeta}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -129,14 +97,18 @@ export default function EventScreen() {
           <Text style={styles.pickerLabel}>Choose Date</Text>
           <View style={styles.pickerValueRow}>
             <Ionicons name="calendar-outline" size={12} color="#C4F27F" />
-            <Text style={styles.pickerValue}>12 Apr</Text>
+            <Text style={styles.pickerValue}>
+              {event?.startDate ? shortDate(event.startDate) : '—'}
+            </Text>
           </View>
         </View>
         <View style={styles.pickerCard}>
           <Text style={styles.pickerLabel}>Choose in Time</Text>
           <View style={styles.pickerValueRow}>
             <Ionicons name="time-outline" size={12} color="#C4F27F" />
-            <Text style={styles.pickerValue}>9:00 PM</Text>
+            <Text style={styles.pickerValue}>
+              {event?.startDate ? shortTime(event.startDate) : '—'}
+            </Text>
           </View>
         </View>
         <View style={styles.pickerCard}>
@@ -185,128 +157,133 @@ export default function EventScreen() {
         showsVerticalScrollIndicator={false}>
         {tab === 'tickets' && (
           <View style={{ gap: 10 }}>
-            {TICKETS.map((tk) => (
-              <View key={tk.id} style={styles.ticketRow}>
-                <View style={styles.ticketIcon}>
-                  <Ionicons name="ticket-outline" size={18} color="#C4F27F" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.ticketHeader}>
-                    <Text style={styles.ticketName}>{tk.name}</Text>
-                    <Ionicons
-                      name="information-circle-outline"
-                      size={12}
-                      color="rgba(255,255,255,0.4)"
-                    />
+            {ticketTiers.length === 0 ? (
+              <Text style={styles.emptyTabText}>
+                {isLoading ? 'Loading tickets…' : 'No tickets available'}
+              </Text>
+            ) : (
+              ticketTiers.map((tk) => {
+                const remaining = tk.quantity - tk.sold;
+                const soldOut = remaining <= 0;
+                return (
+                  <View key={tk.id} style={styles.ticketRow}>
+                    <View style={styles.ticketIcon}>
+                      <Ionicons name="ticket-outline" size={18} color="#C4F27F" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.ticketHeader}>
+                        <Text style={styles.ticketName}>{tk.name}</Text>
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={12}
+                          color="rgba(255,255,255,0.4)"
+                        />
+                      </View>
+                      <Text style={styles.ticketPrice}>{formatPrice(tk.price)}</Text>
+                      {tk.description ? (
+                        <Text style={styles.ticketPerk}>· {tk.description}</Text>
+                      ) : null}
+                      <Text style={styles.ticketPerk}>
+                        · {soldOut ? 'Sold out' : `${remaining} left`}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.addBtn, soldOut && { opacity: 0.4 }]}
+                      activeOpacity={0.85}
+                      disabled={soldOut}>
+                      <Text style={styles.addText}>Add</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.ticketPrice}>{tk.price}</Text>
-                  {tk.perks.map((p) => (
-                    <Text key={p} style={styles.ticketPerk}>
-                      · {p}
-                    </Text>
-                  ))}
-                </View>
-                <TouchableOpacity style={styles.addBtn} activeOpacity={0.85}>
-                  <Text style={styles.addText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+                );
+              })
+            )}
           </View>
         )}
 
         {tab === 'overview' && (
           <View style={{ gap: 18 }}>
-            <View>
-              <Text style={styles.smallHeading}>Organized By</Text>
-              <View style={styles.orgRow}>
-                <View style={styles.orgAvatar} />
-                <Text style={styles.orgName}>Name of the organizer</Text>
-                <TouchableOpacity style={styles.followBtn} activeOpacity={0.85}>
-                  <Text style={styles.followText}>Follow</Text>
-                </TouchableOpacity>
+            {event?.merchant ? (
+              <View>
+                <Text style={styles.smallHeading}>Organized By</Text>
+                <View style={styles.orgRow}>
+                  <View style={styles.orgAvatar} />
+                  <Text style={styles.orgName}>
+                    {event.merchant.businessName}
+                  </Text>
+                  <TouchableOpacity style={styles.followBtn} activeOpacity={0.85}>
+                    <Text style={styles.followText}>Follow</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            ) : null}
 
-            <View>
-              <Text style={styles.smallHeading}>About the event</Text>
-              <Text style={styles.aboutText}>
-                Sabrina Carpenter brings her Short n’ Sweet World Tour to
-                Atlanta’s East Wing Arena. Expect fan-favourite hits, dazzling
-                production, and an intimate atmosphere despite the large venue.
-              </Text>
-            </View>
+            {event?.description ? (
+              <View>
+                <Text style={styles.smallHeading}>About the event</Text>
+                <Text style={styles.aboutText}>{event.description}</Text>
+              </View>
+            ) : null}
 
             <View>
               <Text style={styles.smallHeading}>Event Details</Text>
               <View style={styles.detailGrid}>
-                <DetailItem icon="time-outline" label="3 hrs duration" />
-                <DetailItem icon="walk-outline" label="Doors 5:00 PM" />
-                <DetailItem icon="people-outline" label="Open stage" />
-                <DetailItem icon="car-outline" label="No parking" />
+                {event?.startDate ? (
+                  <DetailItem
+                    icon="time-outline"
+                    label={`Starts ${shortTime(event.startDate)}`}
+                  />
+                ) : null}
+                {event?.capacity ? (
+                  <DetailItem
+                    icon="people-outline"
+                    label={`${event.capacity.toLocaleString()} capacity`}
+                  />
+                ) : null}
+                {event?.type ? (
+                  <DetailItem
+                    icon="pricetag-outline"
+                    label={event.type.replace(/_/g, ' ').toLowerCase()}
+                  />
+                ) : null}
               </View>
             </View>
 
-            <View>
-              <Text style={styles.smallHeading}>Venue</Text>
-              <View style={styles.venueCard}>
-                <View style={styles.venueImage}>
+            {event?.venue || event?.address ? (
+              <View>
+                <Text style={styles.smallHeading}>Venue</Text>
+                <View style={styles.venueCard}>
+                  <View style={styles.venueImage}>
+                    <Ionicons
+                      name="business-outline"
+                      size={22}
+                      color="rgba(255,255,255,0.4)"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.venueName}>
+                      {event?.venue ?? 'Venue'}
+                    </Text>
+                    <Text style={styles.venueAddr}>
+                      {[event?.address, event?.city]
+                        .filter((x): x is string => !!x)
+                        .join(' · ')}
+                    </Text>
+                  </View>
                   <Ionicons
-                    name="business-outline"
-                    size={22}
+                    name="chevron-forward"
+                    size={16}
                     color="rgba(255,255,255,0.4)"
                   />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.venueName}>Materil Arena</Text>
-                  <Text style={styles.venueAddr}>
-                    East Wing, Atlanta · 12,000 capacity
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color="rgba(255,255,255,0.4)"
-                />
               </View>
-            </View>
+            ) : null}
           </View>
         )}
 
         {tab === 'lineup' && (
-          <View style={{ gap: 14 }}>
-            <View style={styles.dateChipRow}>
-              <View style={styles.dateChip}>
-                <Text style={styles.dateChipDay}>12 Apr</Text>
-                <Text style={styles.dateChipSub}>Monday</Text>
-              </View>
-            </View>
-            <View style={styles.timelineCard}>
-              {PERFORMERS.map((p, idx) => (
-                <View
-                  key={p.id}
-                  style={[
-                    styles.performerRow,
-                    idx === PERFORMERS.length - 1 && { borderBottomWidth: 0 },
-                  ]}>
-                  <View
-                    style={[styles.performerAvatar, { backgroundColor: p.color }]}>
-                    <Text style={styles.performerInitials}>
-                      {p.name
-                        .split(' ')
-                        .map((s) => s[0])
-                        .slice(0, 2)
-                        .join('')}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.performerName}>{p.name}</Text>
-                    <Text style={styles.performerRole}>
-                      {p.role} · {p.start} - {p.end}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+          <View style={styles.emptyTabWrap}>
+            <Ionicons name="musical-notes-outline" size={36} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyTabText}>Lineup coming soon.</Text>
           </View>
         )}
 
@@ -325,7 +302,7 @@ export default function EventScreen() {
           onPress={() =>
             router.push({
               pathname: '/book',
-              params: { type: 'event', eventId: id ?? '', title: 'Sabrina Carpenter' },
+              params: { type: 'event', eventId: id ?? '', title },
             })
           }>
           <Text style={styles.bookText}>Book a ticket</Text>
@@ -336,7 +313,7 @@ export default function EventScreen() {
           onPress={() =>
             router.push({
               pathname: '/checkin',
-              params: { eventId: id ?? '', title: 'Sabrina Carpenter', tickets: String(tickets) },
+              params: { eventId: id ?? '', title, tickets: String(tickets) },
             })
           }>
           <Ionicons name="finger-print" size={14} color="#000" />

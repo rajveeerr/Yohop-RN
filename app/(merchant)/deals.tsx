@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MerchantDrawer } from '@/components/merchant-drawer';
 import { MerchantTopBar } from '@/components/merchant-top-bar';
-import { MOCK_DEALS } from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useMerchantDealsList } from '@/hooks/use-merchant-crud';
 import type { Deal } from '@/services/types';
 
 type Filter = 'all' | 'active' | 'flash' | 'inactive';
@@ -21,8 +22,12 @@ export default function MerchantDealsScreen() {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
+  const { data: me } = useMe();
+  const { data: deals, isLoading } = useMerchantDealsList(
+    me?.merchantId ?? undefined,
+  );
 
-  const filtered = MOCK_DEALS.filter((d) => {
+  const filtered = (deals ?? []).filter((d) => {
     if (filter === 'active') return d.isActive;
     if (filter === 'flash') return d.isFlashSale;
     if (filter === 'inactive') return !d.isActive;
@@ -76,8 +81,13 @@ export default function MerchantDealsScreen() {
             }
           />
         ))}
-        {filtered.length === 0 && (
-          <Text style={styles.emptyText}>No deals match this filter</Text>
+        {isLoading && filtered.length === 0 && (
+          <Text style={styles.emptyText}>Loading deals…</Text>
+        )}
+        {!isLoading && filtered.length === 0 && (
+          <Text style={styles.emptyText}>
+            {deals?.length === 0 ? 'No deals yet' : 'No deals match this filter'}
+          </Text>
         )}
       </ScrollView>
 

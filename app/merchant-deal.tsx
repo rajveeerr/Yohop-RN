@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,7 +16,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
-import { MOCK_DEALS } from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useDeal } from '@/hooks/use-deals';
+import {
+  useCreateMerchantDeal,
+  useUpdateMerchantDeal,
+} from '@/hooks/use-merchant-crud';
+import type { Deal } from '@/services/types';
 
 type DealType = 'discount' | 'free-item' | 'buy-x-get-y' | 'bounty';
 type DealTime = 'morning' | 'midday' | 'evening';
@@ -94,14 +101,16 @@ const TIPS: Record<DealType, string> = {
 export default function MerchantDealEditor() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const existing = useMemo(
-    () => (id ? MOCK_DEALS.find((d) => d.id === id) : undefined),
-    [id],
-  );
+  const { data: me } = useMe();
+  const merchantId = me?.merchantId ?? undefined;
+  const { data: existing } = useDeal(id);
+  const createDeal = useCreateMerchantDeal(merchantId);
+  const updateDeal = useUpdateMerchantDeal(merchantId);
+  const saving = createDeal.isPending || updateDeal.isPending;
 
   const [dealName, setDealName] = useState(existing?.title ?? 'Happy Hour - Free Dessert');
   const [type, setType] = useState<DealType>(
-    existing?.discountPercentage ? 'discount' : 'discount',
+    existing?.isBounty ? 'bounty' : 'discount',
   );
 
   // % discount
@@ -153,7 +162,53 @@ export default function MerchantDealEditor() {
   const isBuyXGetY = type === 'buy-x-get-y';
   const isBounty = type === 'bounty';
 
-  const canPublish = dealName.trim().length > 0;
+  const canPublish = dealName.trim().length > 0 && !!merchantId;
+
+  const buildPayload = (publish: boolean): Partial<Deal> => {
+    const payload: Partial<Deal> = {
+      title: dealName,
+      description: description || null,
+      images: heroUri ? [heroUri] : [],
+      isActive: publish,
+      isFlashSale: false,
+      isBounty,
+      bountyReward: isBounty ? Number(pointsX) * 10 : null,
+      maxRedemptions: maxRedemptions ? Number(maxRedemptions) : null,
+      discountPercentage: isDiscount && discountPct ? Number(discountPct) : null,
+    };
+    if (startDate || startTime) {
+      payload.startTime = combineDateTime(startDate, startTime);
+    }
+    if (endDate || endTime) {
+      payload.endTime = combineDateTime(endDate, endTime);
+    }
+    return payload;
+  };
+
+  const onSave = async (publish: boolean) => {
+    if (!merchantId) {
+      Alert.alert('Not a merchant', 'Complete merchant onboarding first.');
+      return;
+    }
+    try {
+      const payload = buildPayload(publish);
+      if (id) {
+        await updateDeal.mutateAsync({ dealId: id, ...payload });
+      } else {
+        await createDeal.mutateAsync(payload);
+      }
+      if (publish) {
+        router.replace({
+          pathname: '/deal-published',
+          params: { name: dealName },
+        });
+      } else {
+        router.back();
+      }
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.message ?? 'Please try again.');
+    }
+  };
 
   const toggleDay = (d: string) => {
     setRecurringDays((prev) => {
@@ -842,21 +897,22 @@ export default function MerchantDealEditor() {
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.publishBtn, !canPublish && styles.publishBtnDisabled]}
+            style={[
+              styles.publishBtn,
+              (!canPublish || saving) && styles.publishBtnDisabled,
+            ]}
             activeOpacity={0.85}
-            disabled={!canPublish}
-            onPress={() =>
-              router.replace({
-                pathname: '/deal-published',
-                params: { name: dealName },
-              })
-            }>
-            <Text style={styles.publishText}>Publish deal</Text>
+            disabled={!canPublish || saving}
+            onPress={() => onSave(true)}>
+            <Text style={styles.publishText}>
+              {saving ? 'Saving…' : id ? 'Update deal' : 'Publish deal'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.draftBtn}
             activeOpacity={0.85}
-            onPress={() => router.back()}>
+            disabled={saving}
+            onPress={() => onSave(false)}>
             <Text style={styles.draftText}>Save as draft</Text>
           </TouchableOpacity>
         </View>
@@ -893,6 +949,19 @@ function SmallField({
       </View>
     </View>
   );
+}
+
+function combineDateTime(date: string, time: string): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  if (time) {
+    const match = time.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      d.setHours(Number(match[1]), Number(match[2]), 0, 0);
+    }
+  }
+  return d.toISOString();
 }
 
 const styles = StyleSheet.create({

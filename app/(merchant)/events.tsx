@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MerchantDrawer } from '@/components/merchant-drawer';
 import { MerchantTopBar } from '@/components/merchant-top-bar';
-import { MOCK_EVENTS } from '@/constants/merchant-mock';
+import { useEvents } from '@/hooks/use-events';
 import type { PlatformEvent } from '@/services/types';
 
 function formatDate(iso: string): string {
@@ -35,6 +35,8 @@ function formatTime(iso: string): string {
 export default function MerchantEventsScreen() {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data: events, isLoading } = useEvents();
+  const list = events ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -47,15 +49,21 @@ export default function MerchantEventsScreen() {
       <ScrollView
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}>
-        {MOCK_EVENTS.map((e) => (
-          <EventCard
-            key={e.id}
-            event={e}
-            onPress={() =>
-              router.push({ pathname: '/merchant-event', params: { id: e.id } })
-            }
-          />
-        ))}
+        {isLoading && list.length === 0 ? (
+          <Text style={styles.emptyText}>Loading events…</Text>
+        ) : list.length === 0 ? (
+          <Text style={styles.emptyText}>No events yet</Text>
+        ) : (
+          list.map((e) => (
+            <EventCard
+              key={e.id}
+              event={e}
+              onPress={() =>
+                router.push({ pathname: '/merchant-event', params: { id: e.id } })
+              }
+            />
+          ))
+        )}
       </ScrollView>
 
       <TouchableOpacity
@@ -131,6 +139,12 @@ function EventCard({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
+  emptyText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 60,
+  },
   list: {
     paddingHorizontal: 14,
     paddingTop: 6,

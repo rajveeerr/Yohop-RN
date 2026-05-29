@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
 import { MERCHANT_BUSINESS } from '@/constants/merchant-mock';
+import { useMe } from '@/hooks/use-auth';
+import { useUpdateMerchant } from '@/hooks/use-merchant-crud';
 import { merchantStorage } from '@/services/storage';
 import {
   useStoredMerchantProfile,
@@ -36,6 +39,8 @@ const CATEGORIES: CategoryOption[] = [
 export default function MerchantEditScreen() {
   const router = useRouter();
   const stored = useStoredMerchantProfile();
+  const { data: me } = useMe();
+  const updateMerchant = useUpdateMerchant(me?.merchantId ?? undefined);
   const [category, setCategory] = useState<MerchantCategory>(
     stored?.category ?? 'restaurant',
   );
@@ -61,19 +66,34 @@ export default function MerchantEditScreen() {
   );
 
   const onSave = async () => {
-    await merchantStorage.save({
-      category,
-      businessName,
-      businessBio: bio,
-      logoUri: stored?.logoUri ?? null,
-      photos: stored?.photos ?? [],
-      address,
-      websiteUrl: website,
-      email,
-      contactNumber: contact,
-      services,
-    });
-    router.back();
+    try {
+      await merchantStorage.save({
+        category,
+        businessName,
+        businessBio: bio,
+        logoUri: stored?.logoUri ?? null,
+        photos: stored?.photos ?? [],
+        address,
+        websiteUrl: website,
+        email,
+        contactNumber: contact,
+        services,
+      });
+      if (me?.merchantId) {
+        await updateMerchant.mutateAsync({
+          businessName,
+          description: bio,
+          category,
+          address,
+          logo: stored?.logoUri ?? null,
+          gallery: stored?.photos ?? [],
+        });
+      }
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.message ?? 'Saved locally — sync failed.');
+      router.back();
+    }
   };
 
   return (

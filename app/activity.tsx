@@ -9,59 +9,34 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMe } from '@/hooks/use-auth';
+import { useActivity } from '@/hooks/use-bookings';
+import { useProfileStats } from '@/hooks/use-profile';
+import type { ActivityItem } from '@/services/types';
 
-type ActivityKind = 'checkin' | 'points' | 'invite' | 'venue-alert';
-
-type Activity = {
-  id: string;
-  kind: ActivityKind;
-  title: string;
-  meta: string;
-  time: string;
-  ctaJoin?: boolean;
+const KIND_META: Record<
+  ActivityItem['kind'],
+  { icon: keyof typeof Ionicons.glyphMap; bg: string; fg: string }
+> = {
+  table: { icon: 'restaurant', bg: 'rgba(196,242,127,0.12)', fg: '#C4F27F' },
+  service: { icon: 'sparkles', bg: 'rgba(196,242,127,0.12)', fg: '#C4F27F' },
+  event: { icon: 'ticket', bg: 'rgba(255,179,0,0.18)', fg: '#FFB300' },
 };
 
-const ACTIVITIES: Activity[] = [
-  {
-    id: '1',
-    kind: 'checkin',
-    title: 'Checked into PCO Bar',
-    meta: '2 hours ago · South Delhi',
-    time: '2h',
-  },
-  {
-    id: '2',
-    kind: 'points',
-    title: 'Earned 50 points at Social',
-    meta: '3 hours ago · HKV',
-    time: '3h',
-  },
-  {
-    id: '3',
-    kind: 'invite',
-    title: 'Tony Stark at LCD',
-    meta: 'Just now · Connaught Place',
-    time: 'now',
-    ctaJoin: true,
-  },
-  {
-    id: '4',
-    kind: 'venue-alert',
-    title: 'New venue alert: The Piano Man',
-    meta: '4 hours ago · Aerocity',
-    time: '4h',
-  },
-];
-
-const KIND_META: Record<ActivityKind, { icon: keyof typeof Ionicons.glyphMap; bg: string; fg: string }> = {
-  checkin: { icon: 'location', bg: 'rgba(196,242,127,0.12)', fg: '#C4F27F' },
-  points: { icon: 'sparkles', bg: 'rgba(196,242,127,0.12)', fg: '#C4F27F' },
-  invite: { icon: 'people', bg: 'rgba(255,179,0,0.18)', fg: '#FFB300' },
-  'venue-alert': { icon: 'flag', bg: 'rgba(255,255,255,0.08)', fg: 'rgba(255,255,255,0.85)' },
-};
+function formatPoints(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
 
 export default function ActivityScreen() {
   const router = useRouter();
+  const { data: me } = useMe();
+  const { data: stats } = useProfileStats();
+  const activity = useActivity();
+
+  const totalCheckIns = stats?.totalCheckIns ?? 0;
+  const points = stats?.points ?? me?.points ?? 0;
+  const items = activity.items;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -85,7 +60,7 @@ export default function ActivityScreen() {
               <Ionicons name="location-outline" size={14} color="#C4F27F" />
               <Text style={styles.statTag}>GLOBAL</Text>
             </View>
-            <Text style={styles.statValue}>42</Text>
+            <Text style={styles.statValue}>{totalCheckIns}</Text>
             <Text style={styles.statLabel}>Total Check-ins</Text>
           </View>
           <View style={styles.statCard}>
@@ -93,7 +68,7 @@ export default function ActivityScreen() {
               <Ionicons name="key-outline" size={14} color="#C4F27F" />
               <Text style={styles.statTag}>PRO</Text>
             </View>
-            <Text style={styles.statValue}>2.4k</Text>
+            <Text style={styles.statValue}>{formatPoints(points)}</Text>
             <Text style={styles.statLabel}>Points Earned</Text>
           </View>
         </View>
@@ -106,40 +81,41 @@ export default function ActivityScreen() {
         </View>
 
         <View style={styles.activityCard}>
-          {ACTIVITIES.map((a, idx) => {
-            const meta = KIND_META[a.kind];
-            return (
-              <View
-                key={a.id}
-                style={[
-                  styles.activityRow,
-                  idx === ACTIVITIES.length - 1 && { borderBottomWidth: 0 },
-                ]}>
-                <View style={[styles.activityIcon, { backgroundColor: meta.bg }]}>
-                  <Ionicons name={meta.icon} size={16} color={meta.fg} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={styles.activityTitle}>
-                    {a.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.activityMeta}>
-                    {a.meta}
-                  </Text>
-                </View>
-                {a.ctaJoin ? (
-                  <TouchableOpacity style={styles.joinBtn} activeOpacity={0.85}>
-                    <Text style={styles.joinText}>JOIN</Text>
-                  </TouchableOpacity>
-                ) : (
+          {activity.isLoading && items.length === 0 ? (
+            <Text style={styles.emptyText}>Loading…</Text>
+          ) : items.length === 0 ? (
+            <Text style={styles.emptyText}>No activity yet</Text>
+          ) : (
+            items.map((a, idx) => {
+              const meta = KIND_META[a.kind];
+              return (
+                <View
+                  key={a.id}
+                  style={[
+                    styles.activityRow,
+                    idx === items.length - 1 && { borderBottomWidth: 0 },
+                  ]}>
+                  <View style={[styles.activityIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon} size={16} color={meta.fg} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={styles.activityTitle}>
+                      {a.title}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.activityMeta}>
+                      {a.sub} · {activity.formatRelative(a.date)}
+                    </Text>
+                  </View>
+                  <Text style={styles.activityPoints}>+{a.points}</Text>
                   <Ionicons
                     name="chevron-forward"
                     size={16}
                     color="rgba(255,255,255,0.3)"
                   />
-                )}
-              </View>
-            );
-          })}
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.exclusiveCard}>
@@ -277,17 +253,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  joinBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#C4F27F',
-  },
-  joinText: {
-    color: '#000',
-    fontSize: 11,
+  activityPoints: {
+    color: '#C4F27F',
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.5,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 30,
   },
   exclusiveCard: {
     marginTop: 18,
