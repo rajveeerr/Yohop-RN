@@ -1,19 +1,19 @@
+import { useMe } from '@/hooks/use-auth';
+import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMe } from '@/hooks/use-auth';
-import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 
 export default function EditProfileScreen() {
   const router = useRouter();

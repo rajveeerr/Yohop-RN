@@ -1,3 +1,8 @@
+import { useMe } from '@/hooks/use-auth';
+import { useDeals, useNearbyDeals } from '@/hooks/use-deals';
+import { useLeaderboard, useMyRank } from '@/hooks/use-leaderboard';
+import { useLocation } from '@/hooks/use-location';
+import type { Deal, LeaderboardEntry } from '@/services/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -12,11 +17,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMe } from '@/hooks/use-auth';
-import { useDeals, useNearbyDeals } from '@/hooks/use-deals';
-import { useLeaderboard, useMyRank } from '@/hooks/use-leaderboard';
-import { useLocation } from '@/hooks/use-location';
-import type { Deal, LeaderboardEntry } from '@/services/types';
 
 type Tab = 'Hot Spots' | 'Leaderboard' | 'Bounties';
 

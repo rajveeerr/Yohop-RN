@@ -1,17 +1,17 @@
+import { useLogout, useMe } from '@/hooks/use-auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLogout, useMe } from '@/hooks/use-auth';
 
 type RowProps = {
   icon: keyof typeof Ionicons.glyphMap;

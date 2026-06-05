@@ -1,4 +1,12 @@
+import { UserDrawer } from '@/components/user-drawer';
+import { useMe } from '@/hooks/use-auth';
+import { useActivity } from '@/hooks/use-bookings';
+import { useAchievementProgress } from '@/hooks/use-gamification';
+import { useMyRank } from '@/hooks/use-leaderboard';
+import { useProfileStats } from '@/hooks/use-profile';
+import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Image,
@@ -9,14 +17,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserDrawer } from '@/components/user-drawer';
-import { useMe } from '@/hooks/use-auth';
-import { useActivity } from '@/hooks/use-bookings';
-import { useAchievementProgress } from '@/hooks/use-gamification';
-import { useMyRank } from '@/hooks/use-leaderboard';
-import { useProfileStats } from '@/hooks/use-profile';
-import { useRouter } from 'expo-router';
-import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 
 type Interest = { key: string; label: string; emoji: string };
 const INTERESTS: Interest[] = [
