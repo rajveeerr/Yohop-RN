@@ -20,9 +20,9 @@ export default function EditProfileScreen() {
   const { data: me } = useMe();
   const merchantProfile = useStoredMerchantProfile();
 
-  const [fullName, setFullName] = useState(me?.name ?? 'Yashika Sharma');
+  const [fullName, setFullName] = useState(me?.name ?? 'Your Name');
   const [username, setUsername] = useState(
-    me?.email?.split('@')[0] ?? 'yashika_.04',
+    me?.email?.split('@')[0] ?? 'user_.01',
   );
   const [bio, setBio] = useState(
     'Avid foodie, gig-goer and spa enthusiast. Delhi’s Best spots, one tap at a time.',
@@ -115,7 +115,7 @@ export default function EditProfileScreen() {
           </View>
           <Field
             label="Email Address"
-            value={me?.email ?? 'yashika@yohop.app'}
+            value={me?.email ?? 'user@yohop.app'}
             onChangeText={() => {}}
             placeholder=""
             editable={false}

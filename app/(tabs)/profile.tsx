@@ -326,7 +326,7 @@ function FeaturedView() {
           <Text style={styles.sparkle}>✦</Text>
           <Text style={styles.memberText}>GOLD MEMBER</Text>
         </View>
-        <Text style={styles.memberName}>Yashika Sharma</Text>
+        <Text style={styles.memberName}>Your Name</Text>
         <View style={styles.perkPillsRow}>
           <View style={styles.perkPill}>
             <Text style={styles.perkPillText}>Priority booking</Text>

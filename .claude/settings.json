@@ -1,7 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell($word = New-Object -ComObject Word.Application; $word.Visible = $false; $doc = $word.Documents.Open\\(\"c:\\\\yohop-yashika-app\\\\backend.docx\", $false, $true\\); $doc.Content.Text; $doc.Close\\(\\); $word.Quit\\(\\))"
+      "PowerShell($word = New-Object -ComObject Word.Application; $word.Visible = $false; $doc = $word.Documents.Open\\(\"c:\\\\yohop-app\\\\backend.docx\", $false, $true\\); $doc.Content.Text; $doc.Close\\(\\); $word.Quit\\(\\))"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json, subprocess, re\ndata = json.load(sys.stdin)\ncmd = data.get('tool_input', {}).get('command', '')\nbackend = '/Users/Rajveer/Desktop/Coding/100xDevs-Journey/Projects/Geolocation-MVP/backend'\nif re.search(r'git\\\\s+(pull|push)', cmd) and backend in cmd:\n    r = subprocess.run(['python3', '/Users/Rajveer/Desktop/Coding/100xDevs-Journey/Projects/Geolocation-MVP/app/.claude/regen-route-index.py'], capture_output=True, text=True)\n    msg = (r.stdout or r.stderr).strip()\n    if msg:\n        import json as j; print(j.dumps({'systemMessage': 'Backend route index: ' + msg}))\n\" 2>/dev/null || true",
+            "statusMessage": "Checking for backend route changes..."
+          }
+        ]
+      }
     ]
   }
 }

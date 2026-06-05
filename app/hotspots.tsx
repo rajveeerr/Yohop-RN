@@ -663,7 +663,7 @@ function LeaderboardView({
   const max = Math.max(...rows.map((r) => r.checkIns), 1);
   const myCheckIns = myRank?.points ?? 3;
   const myRankNum = myRank?.rank ?? 7;
-  const meName = me?.name?.split(' ')[0] ?? 'Yashika';
+  const meName = me?.name?.split(' ')[0] ?? 'Guest';
 
   return (
     <View style={styles.lbWrap}>

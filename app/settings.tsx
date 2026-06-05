@@ -72,8 +72,8 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const firstName = me?.name?.split(' ')[0] ?? 'Yashika';
-  const email = me?.email ?? 'yashika@yohop.app';
+  const firstName = me?.name?.split(' ')[0] ?? 'Guest';
+  const email = me?.email ?? 'user@yohop.app';
   const initials = firstName.slice(0, 2).toUpperCase();
 
   return (
