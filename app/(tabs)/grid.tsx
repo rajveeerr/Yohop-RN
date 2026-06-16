@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -46,6 +48,9 @@ function firstName(name: string | null | undefined): string {
 }
 
 export default function GridScreen() {
+  const router = useRouter();
+  const [offerVisible, setOfferVisible] = useState(true);
+  const [weekLabel, setWeekLabel] = useState<'This Week' | 'This Month'>('This Week');
   const { data: me } = useMe();
   const { data: leaderboard, isLoading: lbLoading } = useLeaderboard('week');
   const { data: myRank } = useMyRank('week');
@@ -86,7 +91,7 @@ export default function GridScreen() {
         </Text>
         <Text style={styles.hey}>Hey, {firstName(me?.name)}</Text>
 
-        <View style={styles.offerCard}>
+        {offerVisible && <View style={styles.offerCard}>
           <View style={styles.offerTextCol}>
             <Text style={styles.offerTag}>
               {offerCount > 0 ? `${offerCount} OFFERS ACTIVE` : 'OFFERS COMING SOON'}
@@ -94,10 +99,10 @@ export default function GridScreen() {
             <Text style={styles.offerTitle}>Unlock your{'\n'}weekend deals</Text>
             <Text style={styles.offerSub}>Expires in 3 days • Terms apply</Text>
             <View style={styles.offerCtaRow}>
-              <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.85}>
+              <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.85} onPress={() => router.push('/(tabs)')}>
                 <Text style={styles.viewAllText}>View all offers</Text>
               </TouchableOpacity>
-              <TouchableOpacity hitSlop={8}>
+              <TouchableOpacity hitSlop={8} onPress={() => setOfferVisible(false)}>
                 <Text style={styles.dismissText}>Dismiss</Text>
               </TouchableOpacity>
             </View>
@@ -110,12 +115,21 @@ export default function GridScreen() {
           <View style={styles.offerBadge}>
             <Text style={styles.offerBadgeText}>%</Text>
           </View>
-        </View>
+        </View>}
 
         <Text style={styles.sectionTitle}>Explore</Text>
         <View style={styles.grid}>
           {CATEGORIES.map((c) => (
-            <TouchableOpacity key={c.key} style={styles.tile} activeOpacity={0.8}>
+            <TouchableOpacity
+              key={c.key}
+              style={styles.tile}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)',
+                  params: { category: c.key },
+                })
+              }>
               <View style={styles.tileIconBox}>
                 <Text style={styles.tileEmoji}>{c.emoji}</Text>
               </View>
@@ -128,9 +142,9 @@ export default function GridScreen() {
         <View style={styles.leaderCard}>
           <View style={styles.leaderHeader}>
             <Text style={styles.leaderTitle}>Top Check-ins</Text>
-            <TouchableOpacity style={styles.weekPill} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.weekPill} activeOpacity={0.8} onPress={() => setWeekLabel(weekLabel === 'This Week' ? 'This Month' : 'This Week')}>
               <Ionicons name="calendar-outline" size={12} color="#fff" />
-              <Text style={styles.weekText}>This Week</Text>
+              <Text style={styles.weekText}>{weekLabel}</Text>
               <Ionicons name="chevron-down" size={12} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -185,7 +199,7 @@ export default function GridScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.viewFull} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.viewFull} activeOpacity={0.8} onPress={() => router.push('/leaderboard')}>
           <Text style={styles.viewFullText}>View full leaderboard </Text>
           <Ionicons name="arrow-forward" size={14} color="#fff" />
         </TouchableOpacity>

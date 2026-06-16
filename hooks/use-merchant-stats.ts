@@ -25,5 +25,6 @@ export function useMerchantStats(merchantId: string | undefined) {
     queryFn: () =>
       unwrap(apiGet<MerchantStats>(`/merchants/${merchantId}/stats`)),
     enabled: !!merchantId,
+    staleTime: 3 * 60 * 1000,
   });
 }

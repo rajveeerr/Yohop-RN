@@ -1,9 +1,14 @@
 import { useMe } from '@/hooks/use-auth';
+import { useUpdateProfile, useUploadAvatar } from '@/hooks/use-profile';
 import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -19,17 +24,54 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const { data: me } = useMe();
   const merchantProfile = useStoredMerchantProfile();
+  const updateProfile = useUpdateProfile();
+  const uploadAvatar = useUploadAvatar();
 
   const [fullName, setFullName] = useState(me?.name ?? 'Your Name');
   const [username, setUsername] = useState(
     me?.email?.split('@')[0] ?? 'user_.01',
   );
   const [bio, setBio] = useState(
-    'Avid foodie, gig-goer and spa enthusiast. Delhi’s Best spots, one tap at a time.',
+    "Avid foodie, gig-goer and spa enthusiast. Delhi's Best spots, one tap at a time.",
   );
   const [linkA, setLinkA] = useState('');
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
   const isPro = !!merchantProfile;
+  const busy = updateProfile.isPending || uploadAvatar.isPending;
+
+  const onPickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission required', 'Allow access to your photo library to change your profile photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      setLocalAvatar(uri);
+      try {
+        await uploadAvatar.mutateAsync(uri);
+      } catch (e: any) {
+        Alert.alert('Upload failed', e?.message ?? 'Could not upload avatar.');
+        setLocalAvatar(null);
+      }
+    }
+  };
+
+  const onSave = async () => {
+    try {
+      await updateProfile.mutateAsync({ name: fullName, bio });
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Save failed', e?.message ?? 'Could not save profile.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -41,10 +83,15 @@ export default function EditProfileScreen() {
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.saveBtn}
+          style={[styles.saveBtn, busy && { opacity: 0.6 }]}
           activeOpacity={0.85}
-          onPress={() => router.back()}>
-          <Text style={styles.saveText}>Save</Text>
+          disabled={busy}
+          onPress={onSave}>
+          {busy ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <Text style={styles.saveText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -56,8 +103,20 @@ export default function EditProfileScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.avatarWrap}>
-            <TouchableOpacity style={styles.avatar} activeOpacity={0.85}>
-              <Ionicons name="camera-outline" size={22} color="#fff" />
+            <TouchableOpacity style={styles.avatar} activeOpacity={0.85} onPress={onPickAvatar}>
+              {localAvatar || me?.avatar ? (
+                <Image
+                  source={{ uri: localAvatar ?? me?.avatar! }}
+                  style={styles.avatarImg}
+                />
+              ) : (
+                <Ionicons name="camera-outline" size={22} color="#fff" />
+              )}
+              {uploadAvatar.isPending && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
             </TouchableOpacity>
             <Text style={styles.avatarLabel}>Change Profile Photo</Text>
           </View>
@@ -237,6 +296,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },

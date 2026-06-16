@@ -27,17 +27,6 @@ const INTERESTS: Interest[] = [
   { key: 'spa', label: 'Spa', emoji: '💆' },
 ];
 
-const GRID_IMAGES = [
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80',
-  'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=400&q=80',
-  'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&q=80',
-  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&q=80',
-  'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&q=80',
-  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80',
-  'https://images.unsplash.com/photo-1555992336-fb0d29498b13?w=400&q=80',
-  'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&q=80',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&q=80',
-];
 
 type ViewMode = 'grid' | 'list' | 'starred' | 'featured' | 'liked';
 
@@ -71,9 +60,20 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topRow}>
         <Text style={styles.username}>{usernameFrom(me?.email)}</Text>
-        <TouchableOpacity hitSlop={8} onPress={() => setDrawerOpen(true)}>
-          <Ionicons name="menu" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.topRowRight}>
+          <TouchableOpacity hitSlop={8} onPress={() => router.push('/favorites')}>
+            <Ionicons name="heart-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={() => router.push('/referral')} style={{ marginLeft: 14 }}>
+            <Ionicons name="gift-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={() => router.push('/settings')} style={{ marginLeft: 14 }}>
+            <Ionicons name="settings-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={() => setDrawerOpen(true)} style={{ marginLeft: 14 }}>
+            <Ionicons name="menu" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <UserDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -85,9 +85,15 @@ export default function ProfileScreen() {
         <View style={styles.headerRow}>
           <View style={styles.avatar} />
           <View style={styles.statsCol}>
-            <Stat num={String(bookingsCount)} label="Bookings" />
-            <Stat num={formatPoints(points)} label="Points" />
-            <Stat num={rankLabel} label="Rank" />
+            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/activity')}>
+              <Stat num={String(bookingsCount)} label="Bookings" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/rewards')}>
+              <Stat num={formatPoints(points)} label="Points" />
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/leaderboard')}>
+              <Stat num={rankLabel} label="Rank" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -114,7 +120,7 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.editBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.editBtn} activeOpacity={0.85} onPress={() => router.push('/edit-profile')}>
             <Text style={styles.editBtnText}>Edit Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.shareBtn} activeOpacity={0.85}>
@@ -177,18 +183,25 @@ export default function ProfileScreen() {
         </View>
 
         {view === 'grid' && (
-          <View style={styles.grid}>
-            {GRID_IMAGES.map((uri, idx) => (
-              <View key={idx} style={styles.gridItem}>
-                <Image source={{ uri }} style={styles.gridImage} />
-                <View style={styles.pointsPill}>
-                  <Text style={styles.pointsText}>
-                    +{idx % 2 === 1 ? 300 : 120} pts
-                  </Text>
+          activity.items.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="images-outline" size={36} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.emptyText}>No activity photos yet</Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {activity.items.slice(0, 9).map((a, idx) => (
+                <View key={a.id} style={styles.gridItem}>
+                  <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                    <Text style={styles.gridEmoji}>{a.emoji}</Text>
+                  </View>
+                  <View style={styles.pointsPill}>
+                    <Text style={styles.pointsText}>+{a.points} pts</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
         )}
 
         {view === 'list' && (
@@ -226,6 +239,12 @@ export default function ProfileScreen() {
         {view === 'liked' && (
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Nothing here yet</Text>
+            <TouchableOpacity
+              style={styles.favLink}
+              activeOpacity={0.85}
+              onPress={() => router.push('/favorites')}>
+              <Text style={styles.favLinkText}>View Saved Deals</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -305,28 +324,21 @@ function StarredView() {
   );
 }
 
-type Benefit = {
-  id: string;
-  label: string;
-  status: string;
-  tone: 'good' | 'muted' | 'active';
-};
-const BENEFITS: Benefit[] = [
-  { id: '1', label: 'Free drink', status: '1 left', tone: 'good' },
-  { id: '2', label: 'Priority slots', status: 'used', tone: 'muted' },
-  { id: '3', label: 'Events presale access', status: 'Active', tone: 'active' },
-];
-
 function FeaturedView() {
+  const { data: me } = useMe();
+  const { data: stats } = useProfileStats();
+  const tier = me?.loyaltyTier ?? 'BRONZE';
+  const points = stats?.points ?? me?.points ?? 0;
+
   return (
     <View style={styles.featuredWrap}>
       <View style={styles.memberCard}>
         <View style={styles.memberBlob} />
         <View style={styles.memberTagRow}>
           <Text style={styles.sparkle}>✦</Text>
-          <Text style={styles.memberText}>GOLD MEMBER</Text>
+          <Text style={styles.memberText}>{tier} MEMBER</Text>
         </View>
-        <Text style={styles.memberName}>Your Name</Text>
+        <Text style={styles.memberName}>{me?.name ?? 'Member'}</Text>
         <View style={styles.perkPillsRow}>
           <View style={styles.perkPill}>
             <Text style={styles.perkPillText}>Priority booking</Text>
@@ -346,29 +358,23 @@ function FeaturedView() {
       </View>
 
       <View style={styles.benefitsCard}>
-        <Text style={styles.benefitsTitle}>Benefits remaining this month</Text>
-        {BENEFITS.map((b) => (
-          <View key={b.id} style={styles.benefitRow}>
-            <Text style={styles.benefitLabel}>{b.label}</Text>
-            <View
-              style={[
-                styles.statusPill,
-                b.tone === 'good' && styles.statusPillGood,
-                b.tone === 'muted' && styles.statusPillMuted,
-                b.tone === 'active' && styles.statusPillActive,
-              ]}>
-              <Text
-                style={[
-                  styles.statusPillText,
-                  b.tone === 'good' && styles.statusPillTextGood,
-                  b.tone === 'muted' && styles.statusPillTextMuted,
-                  b.tone === 'active' && styles.statusPillTextActive,
-                ]}>
-                {b.status}
-              </Text>
-            </View>
+        <Text style={styles.benefitsTitle}>Your points this month</Text>
+        <View style={styles.benefitRow}>
+          <Text style={styles.benefitLabel}>Total points</Text>
+          <View style={[styles.statusPill, styles.statusPillGood]}>
+            <Text style={[styles.statusPillText, styles.statusPillTextGood]}>
+              {points.toLocaleString()} pts
+            </Text>
           </View>
-        ))}
+        </View>
+        <View style={styles.benefitRow}>
+          <Text style={styles.benefitLabel}>Tier</Text>
+          <View style={[styles.statusPill, styles.statusPillActive]}>
+            <Text style={[styles.statusPillText, styles.statusPillTextActive]}>
+              {tier}
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -569,6 +575,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  gridPlaceholder: {
+    backgroundColor: '#141414',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  gridEmoji: {
+    fontSize: 28,
+  },
   pointsPill: {
     position: 'absolute',
     left: 6,
@@ -637,6 +653,22 @@ const styles = StyleSheet.create({
   emptyText: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
+  },
+  favLink: {
+    marginTop: 14,
+    backgroundColor: '#C4F27F',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  favLinkText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  topRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   emptyListText: {
     color: 'rgba(255,255,255,0.4)',

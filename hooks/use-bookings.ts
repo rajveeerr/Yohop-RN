@@ -16,6 +16,7 @@ export function useTableBookings() {
       if (!token) return [] as TableBooking[];
       return unwrap(apiGet<TableBooking[]>('/table-booking/my-bookings'));
     },
+    staleTime: 60 * 1000,
   });
 }
 
@@ -27,6 +28,7 @@ export function useServiceBookings() {
       if (!token) return [] as ServiceBooking[];
       return unwrap(apiGet<ServiceBooking[]>('/services/my-bookings'));
     },
+    staleTime: 60 * 1000,
   });
 }
 

@@ -10,17 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type Offer = {
-  id: string;
-  title: string;
-  sub: string;
-};
-
-const OFFERS: Offer[] = [
-  { id: '1', title: 'Cantina Crispy Chicken', sub: 'Buy 1, get 1 free (add 2 to basket)' },
-  { id: '2', title: 'Spicy Cheesy Double', sub: 'Buy 1, get 1 free (add 2 to basket)' },
-  { id: '3', title: 'Mango Freeze', sub: 'Buy 1, get 1 free (add 2 to basket)' },
-];
 
 export default function CartScreen() {
   const router = useRouter();
@@ -69,17 +58,6 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {OFFERS.map((o) => (
-          <View key={o.id} style={styles.offerItem}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.offerTitle}>{o.title}</Text>
-              <Text style={styles.offerSub}>{o.sub}</Text>
-            </View>
-            <TouchableOpacity style={styles.plusBtn} activeOpacity={0.7}>
-              <Ionicons name="add" size={18} color="#000" />
-            </TouchableOpacity>
-          </View>
-        ))}
 
         <TouchableOpacity style={styles.addItemsBtn} activeOpacity={0.8}>
           <Ionicons name="add" size={16} color="#000" />

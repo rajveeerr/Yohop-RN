@@ -54,15 +54,14 @@ async function request<T>(
     };
   }
 
-  if (res.status === 401 && auth) {
-    await tokenStorage.clear();
-    onUnauthorized?.();
-  }
-
   let json: ApiResponse<T> | null = null;
   try {
     json = (await res.json()) as ApiResponse<T>;
   } catch {
+    if (res.status === 401 && auth) {
+      await tokenStorage.clear();
+      onUnauthorized?.();
+    }
     return {
       success: false,
       data: null,
@@ -70,11 +69,39 @@ async function request<T>(
     };
   }
 
-  if (!res.ok && json && json.success !== false) {
-    return { success: false, data: null, error: json.error || `HTTP ${res.status}` };
+  const isEnvelope =
+    json !== null && typeof (json as ApiResponse<T>).success === 'boolean';
+
+  if (res.status === 401 && auth) {
+    await tokenStorage.clear();
+    onUnauthorized?.();
   }
 
-  return json ?? { success: false, data: null, error: `HTTP ${res.status}` };
+  if (isEnvelope) {
+    if (!res.ok && json && json.success !== false) {
+      return {
+        success: false,
+        data: null,
+        error: json.error || `HTTP ${res.status}`,
+      };
+    }
+
+    return json ?? { success: false, data: null, error: `HTTP ${res.status}` };
+  }
+
+  if (res.ok) {
+    return {
+      success: true,
+      data: json as T,
+      error: null,
+    };
+  }
+
+  return {
+    success: false,
+    data: null,
+    error: (json as any)?.error || `HTTP ${res.status}`,
+  };
 }
 
 export const apiGet = <T>(path: string, auth = true) =>

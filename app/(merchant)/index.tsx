@@ -17,15 +17,9 @@ import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 
 type ChartTab = 'checkins' | 'revenue' | 'views';
 
-const FALLBACK_WEEK: { day: string; value: number }[] = [
-  { day: 'Mon', value: 0 },
-  { day: 'Tue', value: 0 },
-  { day: 'Wed', value: 0 },
-  { day: 'Thu', value: 0 },
-  { day: 'Fri', value: 0 },
-  { day: 'Sat', value: 0 },
-  { day: 'Sun', value: 0 },
-];
+const EMPTY_WEEK: { day: string; value: number }[] = [
+  'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+].map((day) => ({ day, value: 0 }));
 
 function formatCurrency(n: number | undefined): string {
   if (n === undefined) return '—';
@@ -54,7 +48,7 @@ export default function MerchantHomeScreen() {
       ? stats?.weeklyCheckIns
       : chartTab === 'revenue'
       ? stats?.weeklyRevenue
-      : stats?.weeklyViews) ?? FALLBACK_WEEK;
+      : stats?.weeklyViews) ?? EMPTY_WEEK;
   const maxVal = Math.max(1, ...data.map((d) => d.value));
   const total = data.reduce((s, d) => s + d.value, 0);
   const peakIdx = data.findIndex((d) => d.value === maxVal);
@@ -79,12 +73,20 @@ export default function MerchantHomeScreen() {
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          hitSlop={8}
-          onPress={() => setDrawerOpen(true)}>
-          <Ionicons name="settings-outline" size={20} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            hitSlop={8}
+            onPress={() => router.push('/merchant-analytics')}>
+            <Ionicons name="stats-chart-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            hitSlop={8}
+            onPress={() => setDrawerOpen(true)}>
+            <Ionicons name="settings-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <MerchantDrawer

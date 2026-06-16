@@ -10,6 +10,7 @@ export function useEvents(params?: { city?: string; upcoming?: boolean }) {
   return useQuery({
     queryKey: ['events', params ?? {}],
     queryFn: () => unwrap(apiGet<PlatformEvent[]>(`/events${suffix}`, false)),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -18,5 +19,6 @@ export function useEvent(id: string | undefined) {
     queryKey: ['events', id],
     queryFn: () => unwrap(apiGet<PlatformEvent>(`/events/${id}`, false)),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000,
   });
 }

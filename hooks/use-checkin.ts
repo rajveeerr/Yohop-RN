@@ -62,6 +62,7 @@ export function useCheckInHistory() {
       if (!token) return [] as CheckInHistoryItem[];
       return unwrap(apiGet<CheckInHistoryItem[]>('/users/check-in-history'));
     },
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -73,5 +74,6 @@ export function useCheckInStats() {
       if (!token) return null;
       return unwrap(apiGet<CheckInStats>('/users/check-in-stats'));
     },
+    staleTime: 5 * 60 * 1000,
   });
 }

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,7 +47,7 @@ export default function LeaderboardScreen() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [scope, setScope] = useState<Scope>('global');
   const { data: me } = useMe();
-  const { data: entries, isLoading } = useLeaderboard(period);
+  const { data: entries, isLoading, isRefetching, refetch } = useLeaderboard(period);
   const { data: myRank } = useMyRank(period);
 
   const list: LeaderboardEntry[] = entries ?? [];
@@ -87,7 +88,8 @@ export default function LeaderboardScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#C4F27F" />}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

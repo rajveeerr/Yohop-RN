@@ -60,6 +60,7 @@ export default function RootLayout() {
             <Stack.Screen name="rewards" options={{ headerShown: false }} />
             <Stack.Screen name="contacts" options={{ headerShown: false }} />
             <Stack.Screen name="friends" options={{ headerShown: false }} />
+            <Stack.Screen name="referral" options={{ headerShown: false }} />
             <Stack.Screen name="deal-published" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="deal-status" options={{ headerShown: false }} />
             <Stack.Screen name="event" options={{ headerShown: false }} />

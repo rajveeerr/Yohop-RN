@@ -5,7 +5,7 @@ import { useLocation } from '@/hooks/use-location';
 import type { Deal, LeaderboardEntry } from '@/services/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -20,232 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Tab = 'Hot Spots' | 'Leaderboard' | 'Bounties';
 
-const HERO_FALLBACK =
-  'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=900&q=80';
-const ROW_FALLBACK =
-  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=200&q=80';
 
-function makeFallbackDeals(now: number): Deal[] {
-  const inMs = (mins: number) => new Date(now + mins * 60_000).toISOString();
-  return [
-    {
-      id: 'demo-1',
-      merchantId: 'm-1',
-      merchant: {
-        id: 'm-1',
-        businessName: 'The Dead Rabbit',
-        logo: 'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=200&q=80',
-        address: '30 Water St',
-        city: 'New York',
-        latitude: 40.7033,
-        longitude: -74.012,
-      },
-      title: 'Free Drink',
-      description: 'If you check in within the limited time for happy hours',
-      discountPercentage: null,
-      discountAmount: null,
-      startTime: null,
-      endTime: inMs(45),
-      images: [
-        'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=900&q=80',
-      ],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: true,
-      currentRedemptions: 57,
-      maxRedemptions: 200,
-    },
-    {
-      id: 'demo-2',
-      merchantId: 'm-2',
-      merchant: {
-        id: 'm-2',
-        businessName: 'Death & Co.',
-        logo: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=200&q=80',
-        address: '433 E 6th St',
-        city: 'East Village',
-        latitude: 40.7251,
-        longitude: -73.9836,
-      },
-      title: '$2 cocktails',
-      description: 'Half off well drinks',
-      discountAmount: 2,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(45),
-      images: [],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-    {
-      id: 'demo-3',
-      merchantId: 'm-3',
-      merchant: {
-        id: 'm-3',
-        businessName: 'Attaboy',
-        logo: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=200&q=80',
-        address: '134 Eldridge St',
-        city: 'Lower East Side',
-        latitude: 40.7197,
-        longitude: -73.9912,
-      },
-      title: 'Last call special',
-      description: 'Ending soon',
-      discountAmount: null,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(20),
-      images: [],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-    {
-      id: 'demo-4',
-      merchantId: 'm-4',
-      merchant: {
-        id: 'm-4',
-        businessName: 'Employees Only',
-        logo: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=200&q=80',
-        address: '510 Hudson St',
-        city: 'West Village',
-        latitude: 40.7338,
-        longitude: -74.0056,
-      },
-      title: '$2 cocktails',
-      description: 'Off-menu specials',
-      discountAmount: 2,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(45),
-      images: [],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-    {
-      id: 'demo-5',
-      merchantId: 'm-5',
-      merchant: {
-        id: 'm-5',
-        businessName: 'The Aviary',
-        logo: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=200&q=80',
-        address: '955 W Fulton Market',
-        city: 'Chicago',
-        latitude: 41.886,
-        longitude: -87.6573,
-      },
-      title: 'Last call special',
-      description: 'Ending soon',
-      discountAmount: null,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(15),
-      images: [],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-    {
-      id: 'demo-6',
-      merchantId: 'm-6',
-      merchant: {
-        id: 'm-6',
-        businessName: 'Trick Dog',
-        logo: 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=200&q=80',
-        address: '3010 20th St',
-        city: 'San Francisco',
-        latitude: 37.759,
-        longitude: -122.413,
-      },
-      title: '$2 cocktails',
-      description: 'House cocktails',
-      discountAmount: 2,
-      discountPercentage: null,
-      startTime: null,
-      endTime: null,
-      images: [],
-      isActive: true,
-      isBounty: false,
-      bountyReward: null,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-  ];
-}
-
-function makeFallbackBounties(now: number): Deal[] {
-  const inMs = (mins: number) => new Date(now + mins * 60_000).toISOString();
-  return [
-    {
-      id: 'b-1',
-      merchantId: 'm-7',
-      merchant: {
-        id: 'm-7',
-        businessName: 'Bar Goto',
-        logo: null,
-        address: '245 Eldridge St',
-        city: 'New York',
-        latitude: 40.722,
-        longitude: -73.991,
-      },
-      title: 'Refer a friend',
-      description: 'Get $20 when a friend checks in',
-      discountAmount: null,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(120),
-      images: [],
-      isActive: true,
-      isBounty: true,
-      bountyReward: 20,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-    {
-      id: 'b-2',
-      merchantId: 'm-8',
-      merchant: {
-        id: 'm-8',
-        businessName: 'Maison Premiere',
-        logo: null,
-        address: '298 Bedford Ave',
-        city: 'Brooklyn',
-        latitude: 40.715,
-        longitude: -73.961,
-      },
-      title: 'First-timer reward',
-      description: '$15 bounty for new check-ins',
-      discountAmount: null,
-      discountPercentage: null,
-      startTime: null,
-      endTime: inMs(180),
-      images: [],
-      isActive: true,
-      isBounty: true,
-      bountyReward: 15,
-      isFlashSale: false,
-      currentRedemptions: null,
-      maxRedemptions: null,
-    },
-  ];
-}
 
 function formatHms(ms: number): string {
   if (ms <= 0) return '00:00:00';
@@ -287,14 +62,8 @@ export default function HotspotsScreen() {
   const bounties = useDeals({ isBounty: true, isActive: true });
   const leaderboard = useLeaderboard('week');
 
-  const nowRef = useMemo(() => Date.now(), []);
-  const fallbackDeals = useMemo(() => makeFallbackDeals(nowRef), [nowRef]);
-  const fallbackBounties = useMemo(() => makeFallbackBounties(nowRef), [nowRef]);
-
-  const hotSpotsData =
-    nearby.data && nearby.data.length > 0 ? nearby.data : fallbackDeals;
-  const bountiesData =
-    bounties.data && bounties.data.length > 0 ? bounties.data : fallbackBounties;
+  const hotSpotsData = Array.isArray(nearby.data) ? nearby.data : [];
+  const bountiesData = Array.isArray(bounties.data) ? bounties.data : [];
   const bountyCount = bountiesData.length;
 
   return (
@@ -327,7 +96,7 @@ export default function HotspotsScreen() {
         {tab === 'Hot Spots' && (
           <HotSpotsView
             deals={hotSpotsData}
-            loading={nearby.isLoading && !hotSpotsData.length}
+            loading={nearby.isLoading}
             error={null}
             onPressDeal={(d) =>
               router.push({
@@ -349,7 +118,7 @@ export default function HotspotsScreen() {
         {tab === 'Bounties' && (
           <BountiesView
             deals={bountiesData}
-            loading={bounties.isLoading && !bountiesData.length}
+            loading={bounties.isLoading}
             onPressDeal={(d) =>
               router.push({
                 pathname: '/deal',
@@ -407,17 +176,6 @@ function HotSpotsView({
 
 const BOUNTY_FILTERS = ['Cafes', 'Bars', 'Rooftops', 'Clubs'];
 
-const BOUNTY_FALLBACK: {
-  id: string;
-  name: string;
-  area: string;
-  miles: number;
-  tag: string;
-}[] = [
-  { id: 'b1', name: 'PCO Bar', area: 'Manhattan', miles: 0.3, tag: '$5 Craft Beers' },
-  { id: 'b2', name: 'Liquid Karma', area: 'Williamsburg', miles: 0.3, tag: 'BOGO Drink' },
-  { id: 'b3', name: 'Skyline Heights', area: 'Midtown', miles: 0.3, tag: 'Exclusive' },
-];
 
 function BountiesView({
   deals,
@@ -428,20 +186,17 @@ function BountiesView({
   loading: boolean;
   onPressDeal: (d: Deal) => void;
 }) {
-  const rows =
-    deals.length > 0
-      ? deals.map((d) => ({
-          id: d.id,
-          name: d.merchant?.businessName ?? d.title,
-          area: d.merchant?.city ?? '',
-          miles: 0.3,
-          tag:
-            d.bountyReward != null
-              ? `$${Math.round(d.bountyReward)} Bounty`
-              : (d.title ?? 'Exclusive'),
-          deal: d,
-        }))
-      : BOUNTY_FALLBACK.map((b) => ({ ...b, deal: null as Deal | null }));
+  const rows = deals.map((d) => ({
+    id: d.id,
+    name: d.merchant?.businessName ?? d.title,
+    area: d.merchant?.city ?? '',
+    miles: 0.3,
+    tag:
+      d.bountyReward != null
+        ? `$${Math.round(d.bountyReward)} Bounty`
+        : (d.title ?? 'Exclusive'),
+    deal: d,
+  }));
 
   return (
     <View style={{ paddingHorizontal: 14, paddingTop: 14 }}>
@@ -506,22 +261,22 @@ function BountiesView({
 }
 
 function BountyCountdown({ deal }: { deal?: Deal }) {
-  const fallback = useMemo(() => new Date(Date.now() + 45 * 60_000).toISOString(), []);
-  const text = useCountdown(deal?.endTime ?? fallback);
+  const text = useCountdown(deal?.endTime ?? null);
+  if (!deal?.endTime) return null;
   return <Text style={styles.bountyCountdown}>{text}</Text>;
 }
 
 function FeaturedCard({ deal, onPress }: { deal: Deal; onPress: () => void }) {
   const countdown = useCountdown(deal.endTime);
   const checkedIn = deal.currentRedemptions ?? 0;
-  const hero = deal.images?.[0] ?? deal.merchant?.logo ?? HERO_FALLBACK;
+  const hero = deal.images?.[0] ?? deal.merchant?.logo ?? null;
   const title = deal.merchant?.businessName ?? deal.title;
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
       <ImageBackground
-        source={{ uri: hero }}
-        style={styles.featured}
+        source={hero ? { uri: hero } : undefined}
+        style={[styles.featured, !hero && { backgroundColor: '#1a1a1a' }]}
         imageStyle={styles.featuredImg}>
         <View style={styles.featuredOverlay} />
         <View style={styles.featuredTopRow}>
@@ -579,7 +334,7 @@ function DealRow({ deal, onPress }: { deal: Deal; onPress: () => void }) {
         ? 'Special offer'
         : deal.title;
 
-  const thumb = deal.images?.[0] ?? deal.merchant?.logo ?? ROW_FALLBACK;
+  const thumb = deal.images?.[0] ?? deal.merchant?.logo ?? null;
   const title = deal.merchant?.businessName ?? deal.title;
   const sub = deal.merchant?.city
     ? `${deal.merchant.city}`
@@ -590,7 +345,13 @@ function DealRow({ deal, onPress }: { deal: Deal; onPress: () => void }) {
       activeOpacity={0.85}
       style={styles.row}
       onPress={onPress}>
-      <Image source={{ uri: thumb }} style={styles.rowImg} />
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={styles.rowImg} />
+      ) : (
+        <View style={[styles.rowImg, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
+          <Ionicons name="image-outline" size={16} color="rgba(255,255,255,0.2)" />
+        </View>
+      )}
       <View style={styles.rowText}>
         <Text style={styles.rowTitle} numberOfLines={1}>
           {title}
@@ -630,11 +391,6 @@ function SectionPill({ label }: { label: string }) {
   );
 }
 
-const FALLBACK_LB: { name: string; venue: string; checkIns: number }[] = [
-  { name: 'Riya', venue: 'The Dead Rabbit', checkIns: 9 },
-  { name: 'Aryan', venue: 'Death & Co.', checkIns: 7 },
-  { name: 'Meera', venue: 'Attaboy', checkIns: 6 },
-];
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -650,15 +406,12 @@ function LeaderboardView({
   const { data: me } = useMe();
   const { data: myRank } = useMyRank('week');
 
-  const rows =
-    data.length > 0
-      ? data.slice(0, 3).map((e, i) => ({
-          name: e.name,
-          venue: '',
-          checkIns: e.points,
-          rank: e.rank ?? i + 1,
-        }))
-      : FALLBACK_LB.map((e, i) => ({ ...e, rank: i + 1 }));
+  const rows = data.slice(0, 3).map((e, i) => ({
+    name: e.name,
+    venue: '',
+    checkIns: e.points,
+    rank: e.rank ?? i + 1,
+  }));
 
   const max = Math.max(...rows.map((r) => r.checkIns), 1);
   const myCheckIns = myRank?.points ?? 3;

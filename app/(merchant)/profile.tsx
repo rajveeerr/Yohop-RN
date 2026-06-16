@@ -15,29 +15,36 @@ import { MerchantTopBar } from '@/components/merchant-top-bar';
 import { SectionHeader } from '@/components/section-header';
 import {
   MERCHANT_BUSINESS,
-  MERCHANT_STATS,
 } from '@/constants/merchant-mock';
+import { useMerchantStats } from '@/hooks/use-merchant-stats';
+import { useMe } from '@/hooks/use-auth';
 import { useStoredMerchantProfile } from '@/stores/merchant-draft';
-
-const COVER =
-  'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=900&q=80';
-
-const GALLERY = [
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80',
-  'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&q=80',
-  'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&q=80',
-  'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&q=80',
-  'https://images.unsplash.com/photo-1555992336-fb0d29498b13?w=400&q=80',
-  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80',
-];
-
-const AMENITIES = ['Live DJ', 'Outdoor seating', 'Vegan options', 'Parking', 'Pet friendly'];
-const VIBE = ['Lively', 'Late night', 'Group friendly', 'Music'];
 
 export default function MerchantProfileScreen() {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const stored = useStoredMerchantProfile();
+  const { data: me } = useMe();
+  const { data: stats } = useMerchantStats(me?.merchantId ?? undefined);
+
+  const derivedStats = [
+    {
+      label: 'Revenue',
+      value: stats ? `₹${Math.round(stats.totalRevenue).toLocaleString()}` : '—',
+    },
+    {
+      label: 'Check-ins',
+      value: stats ? String(stats.totalCheckIns) : '—',
+    },
+    {
+      label: 'Avg Group',
+      value: stats ? String(stats.avgGroupSize) : '—',
+    },
+    {
+      label: 'Conv. Rate',
+      value: stats ? `${(stats.conversionRate * 100).toFixed(1)}%` : '—',
+    },
+  ];
 
   const bizName = stored?.businessName || MERCHANT_BUSINESS.name;
   const handle = stored?.businessName
@@ -47,7 +54,7 @@ export default function MerchantProfileScreen() {
     'A late-night neon-soaked club in the heart of Delhi. Curated DJs, craft cocktails, and a no-phone-on-the-floor policy. Open Wed–Sun.';
   const address = stored?.address || 'Hauz Khas Village, Delhi';
   const website = stored?.websiteUrl || 'neon-delhi.com';
-  const galleryImages = stored && stored.photos.length > 0 ? stored.photos : GALLERY;
+  const galleryImages = stored?.photos ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -60,10 +67,13 @@ export default function MerchantProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
-        <Image
-          source={{ uri: stored?.photos?.[0] ?? COVER }}
-          style={styles.cover}
-        />
+        {stored?.photos?.[0] ? (
+          <Image source={{ uri: stored.photos[0] }} style={styles.cover} />
+        ) : (
+          <View style={[styles.cover, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="image-outline" size={32} color="rgba(255,255,255,0.2)" />
+          </View>
+        )}
 
         <View style={styles.header}>
           <View style={styles.logoWrap}>
@@ -106,6 +116,13 @@ export default function MerchantProfileScreen() {
             <Ionicons name="create-outline" size={14} color="#000" />
             <Text style={styles.primaryBtnText}>Edit Business</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            activeOpacity={0.85}
+            onPress={() => router.push('/merchant-menu')}>
+            <Ionicons name="restaurant-outline" size={14} color="#fff" />
+            <Text style={styles.secondaryBtnText}>Menu</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.85}>
             <Ionicons name="share-outline" size={14} color="#fff" />
             <Text style={styles.secondaryBtnText}>Share</Text>
@@ -113,7 +130,7 @@ export default function MerchantProfileScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          {MERCHANT_STATS.map((s) => (
+          {derivedStats.map((s) => (
             <View key={s.label} style={styles.statItem}>
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -151,31 +168,41 @@ export default function MerchantProfileScreen() {
         </View>
 
         <SectionHeader label="Amenities" />
-        <View style={styles.tagsRow}>
-          {AMENITIES.map((t) => (
-            <View key={t} style={styles.tagPill}>
-              <Text style={styles.tagPillText}>{t}</Text>
-            </View>
-          ))}
-        </View>
+        {(stored?.amenities ?? []).length > 0 ? (
+          <View style={styles.tagsRow}>
+            {(stored!.amenities!).map((t) => (
+              <View key={t} style={styles.tagPill}>
+                <Text style={styles.tagPillText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.emptyMeta}>No amenities listed yet.</Text>
+        )}
 
         <SectionHeader label="Vibe" />
-        <View style={styles.tagsRow}>
-          {VIBE.map((t) => (
-            <View key={t} style={[styles.tagPill, styles.tagPillAccent]}>
-              <Text style={[styles.tagPillText, styles.tagPillTextAccent]}>
-                {t}
-              </Text>
-            </View>
-          ))}
-        </View>
+        {(stored?.vibeTags ?? []).length > 0 ? (
+          <View style={styles.tagsRow}>
+            {(stored!.vibeTags!).map((t) => (
+              <View key={t} style={[styles.tagPill, styles.tagPillAccent]}>
+                <Text style={[styles.tagPillText, styles.tagPillTextAccent]}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.emptyMeta}>No vibe tags listed yet.</Text>
+        )}
 
         <SectionHeader label="Gallery" />
-        <View style={styles.gallery}>
-          {galleryImages.map((uri) => (
-            <Image key={uri} source={{ uri }} style={styles.galleryItem} />
-          ))}
-        </View>
+        {galleryImages.length > 0 ? (
+          <View style={styles.gallery}>
+            {galleryImages.map((uri) => (
+              <Image key={uri} source={{ uri }} style={styles.galleryItem} />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.emptyMeta}>No gallery photos yet.</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -356,6 +383,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 11,
     fontWeight: '600',
+  },
+  emptyMeta: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingHorizontal: 18,
+    paddingBottom: 12,
   },
   tagPillAccent: {
     backgroundColor: 'rgba(196,242,127,0.12)',

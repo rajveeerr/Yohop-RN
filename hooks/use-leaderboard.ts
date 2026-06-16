@@ -12,6 +12,7 @@ export function useLeaderboard(period: LeaderboardPeriod = 'week') {
     queryKey: ['leaderboard', period],
     queryFn: () =>
       unwrap(apiGet<LeaderboardEntry[]>(`/leaderboard/${period}`, false)),
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -24,5 +25,6 @@ export function useMyRank(period: LeaderboardPeriod = 'week') {
       return unwrap(apiGet<MyRank>(`/leaderboard/${period}/me`));
     },
     retry: false,
+    staleTime: 3 * 60 * 1000,
   });
 }

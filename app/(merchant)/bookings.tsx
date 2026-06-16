@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MerchantDrawer } from '@/components/merchant-drawer';
 import { MerchantTopBar } from '@/components/merchant-top-bar';
-import { MOCK_BOOKINGS } from '@/constants/merchant-mock';
+import { useMerchantBookings, useUpdateMerchantBookingStatus } from '@/hooks/use-table-booking';
 import type { BookingStatus, TableBooking } from '@/services/types';
 
 type Filter = 'all' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
@@ -34,15 +35,25 @@ const STATUS_STYLE: Record<BookingStatus, { bg: string; fg: string; label: strin
 export default function MerchantBookingsScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
+  const { data, isLoading } = useMerchantBookings();
+  const updateStatus = useUpdateMerchantBookingStatus();
 
-  const filtered = MOCK_BOOKINGS.filter((b) =>
+  const allBookings: TableBooking[] = data ?? [];
+  const filtered = allBookings.filter((b) =>
     filter === 'all' ? true : b.status === filter,
   );
 
   const showActions = (b: TableBooking) => {
     Alert.alert(b.confirmationCode, `Party of ${b.partySize} · ${b.date} ${b.time ?? ''}`, [
-      { text: 'Confirm', onPress: () => {} },
-      { text: 'Cancel booking', style: 'destructive', onPress: () => {} },
+      {
+        text: 'Confirm',
+        onPress: () => updateStatus.mutate({ bookingId: String(b.id), status: 'CONFIRMED' }),
+      },
+      {
+        text: 'Cancel booking',
+        style: 'destructive',
+        onPress: () => updateStatus.mutate({ bookingId: String(b.id), status: 'CANCELLED' }),
+      },
       { text: 'Close', style: 'cancel' },
     ]);
   };
@@ -76,6 +87,9 @@ export default function MerchantBookingsScreen() {
         ))}
       </ScrollView>
 
+      {isLoading && allBookings.length === 0 ? (
+        <ActivityIndicator color="#C4F27F" style={{ marginTop: 40 }} />
+      ) : null}
       <ScrollView
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}>

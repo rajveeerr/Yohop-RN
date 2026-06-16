@@ -86,6 +86,8 @@ export type StoredMerchantProfile = {
   contactNumber: string;
   services: string;
   onboardedAt: string;
+  amenities?: string[];
+  vibeTags?: string[];
 };
 
 const merchantSubscribers = new Set<() => void>();

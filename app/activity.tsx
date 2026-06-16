@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMe } from '@/hooks/use-auth';
-import { useActivity } from '@/hooks/use-bookings';
+import { useActivity, useTableBookings, useServiceBookings } from '@/hooks/use-bookings';
 import { useProfileStats } from '@/hooks/use-profile';
 import type { ActivityItem } from '@/services/types';
 
@@ -33,10 +34,14 @@ export default function ActivityScreen() {
   const { data: me } = useMe();
   const { data: stats } = useProfileStats();
   const activity = useActivity();
+  const tables = useTableBookings();
+  const services = useServiceBookings();
 
   const totalCheckIns = stats?.totalCheckIns ?? 0;
   const points = stats?.points ?? me?.points ?? 0;
   const items = activity.items;
+  const refreshing = tables.isRefetching || services.isRefetching;
+  const onRefresh = () => { tables.refetch(); services.refetch(); };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -53,7 +58,8 @@ export default function ActivityScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C4F27F" />}>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={styles.statIconWrap}>

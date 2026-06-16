@@ -19,6 +19,7 @@ export function useStreakProfile() {
       if (!token) return null;
       return unwrap(apiGet<StreakProfile>('/streak/profile'));
     },
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -30,5 +31,6 @@ export function useStreakRewards() {
       if (!token) return [] as StreakReward[];
       return unwrap(apiGet<StreakReward[]>('/streak/rewards'));
     },
+    staleTime: 10 * 60 * 1000,
   });
 }
