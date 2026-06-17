@@ -1,10 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Image,
-    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -12,8 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+import { useLocation } from '@/hooks/use-location';
 
 type MapMode = 'standard' | 'satellite';
 type TopTab = 'Hot Spots' | 'Leaderboard' | 'Friends';
@@ -91,149 +91,142 @@ const FILTER_CHIPS: {
   { key: 'restaurants', label: 'Restaurants', icon: 'restaurant-outline' },
 ];
 
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0B1426' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#A9B7C9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B1426' }] },
-  {
-    featureType: 'administrative.country',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#BFCBDB' }],
-  },
-  {
-    featureType: 'administrative.land_parcel',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'administrative.locality',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#DDEAF6' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#6B7B92' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'geometry',
-    stylers: [{ color: '#0E2230' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry.fill',
-    stylers: [{ color: '#1A3A4F' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#11293A' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#85B6CC' }],
-  },
-  {
-    featureType: 'road.arterial',
-    elementType: 'geometry',
-    stylers: [{ color: '#1F4A66' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#2A6E91' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#3FA0CC' }],
-  },
-  {
-    featureType: 'road.highway.controlled_access',
-    elementType: 'geometry',
-    stylers: [{ color: '#3FA0CC' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'geometry',
-    stylers: [{ color: '#16364A' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#5E7C92' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#04111F' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#2C4E66' }],
-  },
-];
+// Center on Atlanta (matches the seed/demo data region).
+const CENTER = { lat: 33.79, lng: -84.36, zoom: 12 };
+
+/**
+ * Leaflet + OpenStreetMap map rendered inside a WebView. This is keyless and
+ * works in Expo Go (no native Google Maps module / API key required). The dark
+ * CARTO basemap keeps the app's dark theme; Esri imagery backs satellite mode.
+ * The friend markers are Leaflet divIcons styled to match the old native pins.
+ */
+function buildMapHtml(friends: Friend[]): string {
+  const friendsJson = JSON.stringify(friends);
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; background: #0B1426; }
+    .friend { border: 2px solid #fff; border-radius: 50%; overflow: hidden; background: #000; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
+    .friend.live { border-color: #FF3D6B; box-shadow: 0 0 10px rgba(255,61,107,0.65); }
+    .friend img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .leaflet-control-attribution { font-size: 9px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var FRIENDS = ${friendsJson};
+    var map = L.map('map', { zoomControl: false, attributionControl: true })
+      .setView([${CENTER.lat}, ${CENTER.lng}], ${CENTER.zoom});
+    var layers = {
+      standard: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
+      }),
+      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, attribution: '&copy; Esri'
+      })
+    };
+    var current = 'standard';
+    layers[current].addTo(map);
+    FRIENDS.forEach(function (f) {
+      var html = '<div class="friend' + (f.live ? ' live' : '') + '" style="width:' + f.size + 'px;height:' + f.size + 'px;"><img src="' + f.avatar + '" /></div>';
+      var icon = L.divIcon({ html: html, className: '', iconSize: [f.size, f.size], iconAnchor: [f.size / 2, f.size / 2] });
+      L.marker([f.lat, f.lng], { icon: icon }).addTo(map);
+    });
+    window.setLayer = function (name) {
+      if (name === current || !layers[name]) return;
+      map.removeLayer(layers[current]);
+      layers[name].addTo(map);
+      current = name;
+    };
+    var userMarker = null;
+    var lastUser = null;
+    // Centers the map on the device location and drops/updates a "you" marker.
+    window.setCenter = function (lat, lng, zoom) {
+      lastUser = [lat, lng];
+      map.setView([lat, lng], zoom || map.getZoom());
+      if (userMarker) { userMarker.setLatLng([lat, lng]); }
+      else {
+        userMarker = L.circleMarker([lat, lng], {
+          radius: 8, color: '#fff', weight: 2, fillColor: '#C4F27F', fillOpacity: 1
+        }).addTo(map);
+      }
+    };
+    window.recenter = function () {
+      if (lastUser) map.setView(lastUser, 14);
+      else map.setView([${CENTER.lat}, ${CENTER.lng}], ${CENTER.zoom});
+    };
+  </script>
+</body>
+</html>`;
+}
 
 export default function MapScreen() {
   const router = useRouter();
-  const mapRef = useRef<MapView | null>(null);
+  const webRef = useRef<WebView | null>(null);
   const [tab, setTab] = useState<TopTab>('Friends');
   const [mode, setMode] = useState<MapMode>('standard');
   const [activeChips, setActiveChips] = useState<Record<string, boolean>>({});
+
+  const { location } = useLocation();
+  // Keep latest coords in a ref so onLoadEnd (which fires once) always centers
+  // on the freshest location even if GPS resolves after the WebView mounts.
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
+  // Built once — map state (layer/center) is driven via injectJavaScript so the
+  // WebView never needs to reload.
+  const mapHtml = useMemo(() => buildMapHtml(FRIENDS), []);
+
+  const centerOnUser = useCallback(() => {
+    const l = locationRef.current;
+    webRef.current?.injectJavaScript(
+      `window.setCenter && window.setCenter(${l.latitude}, ${l.longitude}, 13); true;`,
+    );
+  }, []);
+
+  // Re-center whenever the resolved device location changes.
+  useEffect(() => {
+    centerOnUser();
+  }, [location.latitude, location.longitude, centerOnUser]);
 
   const toggleChip = (k: string) =>
     setActiveChips((s) => ({ ...s, [k]: !s[k] }));
 
   const cycleMode = () =>
-    setMode((m) => (m === 'standard' ? 'satellite' : 'standard'));
+    setMode((m) => {
+      const next: MapMode = m === 'standard' ? 'satellite' : 'standard';
+      webRef.current?.injectJavaScript(
+        `window.setLayer && window.setLayer('${next}'); true;`,
+      );
+      return next;
+    });
+
+  const recenter = () =>
+    webRef.current?.injectJavaScript('window.recenter && window.recenter(); true;');
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
 
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_DEFAULT}
-        style={StyleSheet.absoluteFill}
-        initialRegion={{
-          latitude: 33.79,
-          longitude: -84.36,
-          latitudeDelta: 0.22,
-          longitudeDelta: 0.18,
-        }}
-        customMapStyle={DARK_MAP_STYLE}
-        userInterfaceStyle="dark"
-        mapType={mode === 'satellite' ? 'hybrid' : 'standard'}
-        showsCompass={false}
-        showsMyLocationButton={false}
-        showsPointsOfInterest={false}
-        showsBuildings={false}
-        showsTraffic={false}
-        toolbarEnabled={false}>
-        {FRIENDS.map((f) => (
-          <Marker
-            key={f.id}
-            coordinate={{ latitude: f.lat, longitude: f.lng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={Platform.OS === 'ios'}>
-            <View
-              style={[
-                styles.bubble,
-                {
-                  width: f.size,
-                  height: f.size,
-                  borderRadius: f.size / 2,
-                },
-                f.live && styles.bubbleLive,
-              ]}>
-              <Image source={{ uri: f.avatar }} style={styles.bubbleImg} />
-            </View>
-          </Marker>
-        ))}
-      </MapView>
+      <WebView
+        ref={webRef}
+        style={[StyleSheet.absoluteFill, styles.web]}
+        originWhitelist={['*']}
+        source={{ html: mapHtml }}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState
+        scrollEnabled={false}
+        overScrollMode="never"
+        androidLayerType="hardware"
+        onLoadEnd={centerOnUser}
+      />
 
       <View pointerEvents="none" style={styles.vignette} />
 
@@ -324,17 +317,7 @@ export default function MapScreen() {
         <TouchableOpacity
           style={[styles.fab, styles.fabPrimary]}
           activeOpacity={0.85}
-          onPress={() =>
-            mapRef.current?.animateToRegion(
-              {
-                latitude: 33.79,
-                longitude: -84.36,
-                latitudeDelta: 0.22,
-                longitudeDelta: 0.18,
-              },
-              500,
-            )
-          }>
+          onPress={recenter}>
           <Ionicons name="navigate" size={18} color="#000" />
         </TouchableOpacity>
       </View>
@@ -363,6 +346,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B1426' },
+  web: { backgroundColor: '#0B1426' },
   vignette: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.10)',
@@ -450,27 +434,6 @@ const styles = StyleSheet.create({
   chipMore: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-  },
-  bubble: {
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#fff',
-    backgroundColor: '#000',
-    shadowColor: '#000',
-    shadowOpacity: 0.45,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
-  },
-  bubbleLive: {
-    borderColor: '#FF3D6B',
-    shadowColor: '#FF3D6B',
-    shadowOpacity: 0.65,
-    shadowRadius: 10,
-  },
-  bubbleImg: {
-    width: '100%',
-    height: '100%',
   },
   rightControls: {
     position: 'absolute',

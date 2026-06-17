@@ -94,10 +94,7 @@ export default function FriendsScreen() {
         />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsRow}>
+      <View style={styles.tabsRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'all' && styles.tabActive]}
           onPress={() => setTab('all')}
@@ -124,9 +121,10 @@ export default function FriendsScreen() {
             Suggested
           </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <ScrollView
+        style={styles.contentScroll}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
         {tab === 'all' && !query && onlineNow.length > 0 && (
@@ -290,14 +288,14 @@ export default function FriendsScreen() {
         {tab === 'all' && friends.length === 0 && (
           <View style={styles.comingSoon}>
             <Ionicons name="people-outline" size={40} color="rgba(255,255,255,0.2)" />
-            <Text style={styles.comingSoonTitle}>Friends coming soon</Text>
+            <Text style={styles.comingSoonTitle}>No friends yet</Text>
             <Text style={styles.comingSoonSub}>
-              Invite friends and see where they&apos;re hanging out.
+              Invite friends from your contacts to find deals together.
             </Text>
             <TouchableOpacity
               style={styles.inviteBtn}
               activeOpacity={0.85}
-              onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
+              onPress={() => router.push('/contacts')}>
               <Text style={styles.inviteBtnText}>Invite Friends</Text>
             </TouchableOpacity>
           </View>
@@ -354,8 +352,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#fff',
   },
-  tabsRow: { paddingHorizontal: 14, gap: 8, paddingBottom: 8 },
+  tabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 8,
+    paddingBottom: 8,
+  },
   tab: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 16,
@@ -370,6 +375,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tabTextActive: { color: '#000', fontWeight: '700' },
+  contentScroll: { flex: 1 },
   scroll: { paddingHorizontal: 14, paddingBottom: 40 },
   sectionTitle: {
     color: '#fff',

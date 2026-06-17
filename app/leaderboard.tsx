@@ -93,6 +93,7 @@ export default function LeaderboardScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.pillScroll}
           contentContainerStyle={styles.pillRow}>
           {PERIODS.map((p) => (
             <TouchableOpacity
@@ -114,6 +115,7 @@ export default function LeaderboardScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.pillScroll}
           contentContainerStyle={styles.pillRow}>
           {SCOPES.map((s) => (
             <TouchableOpacity
@@ -261,6 +263,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+  pillScroll: { flexGrow: 0 },
   pillRow: {
     gap: 8,
     paddingVertical: 6,

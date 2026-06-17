@@ -8,6 +8,8 @@ import {
   Dimensions,
   FlatList,
   Image as RNImage,
+  Linking,
+  Pressable,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -147,6 +149,16 @@ function eventToFeedItem(e: PlatformEvent): FeedItem {
 
 const FILTERS = ['Events', 'Bars', 'Retail'];
 
+// Cities present in the deal data — picking one re-centers the nearby feed there.
+const PRESET_LOCATIONS = [
+  { label: 'New Orleans, LA', latitude: 29.9511, longitude: -90.0715 },
+  { label: 'Atlanta, GA', latitude: 33.749, longitude: -84.388 },
+  { label: 'Houston, TX', latitude: 29.7604, longitude: -95.3698 },
+  { label: 'Philadelphia, PA', latitude: 39.9526, longitude: -75.1652 },
+  { label: 'Washington, DC', latitude: 38.9072, longitude: -77.0369 },
+  { label: 'New York, NY', latitude: 40.7128, longitude: -74.006 },
+];
+
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -156,7 +168,35 @@ export default function ExploreScreen() {
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const { location } = useLocation();
+  const {
+    location,
+    setLocation,
+    refresh: refreshLocation,
+    loading: locationLoading,
+    permission: locationPermission,
+  } = useLocation();
+  const [locPickerOpen, setLocPickerOpen] = useState(false);
+
+  const useCurrentLocation = () => {
+    setLocPickerOpen(false);
+    if (locationPermission === 'denied') {
+      Alert.alert(
+        'Location off',
+        'Enable location access in Settings to use your current location.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+    refreshLocation();
+  };
+
+  const pickPreset = (loc: (typeof PRESET_LOCATIONS)[number]) => {
+    setLocation({ latitude: loc.latitude, longitude: loc.longitude, label: loc.label });
+    setLocPickerOpen(false);
+  };
   const isEvents = activeFilter === 'Events';
   const dealsQuery = useNearbyDeals({
     latitude: location.latitude,
@@ -284,9 +324,16 @@ export default function ExploreScreen() {
               ))}
           </ScrollView>
           <View style={styles.topRight}>
-            <TouchableOpacity style={styles.greenPill} activeOpacity={0.8} onPress={() => Alert.alert('Location Filter', 'Location-based filtering coming soon.')}>
+            <TouchableOpacity style={styles.greenPill} activeOpacity={0.8} onPress={() => setLocPickerOpen(true)}>
               <Ionicons name="location" size={14} color="#000" />
-              <Ionicons name="chevron-down" size={12} color="#000" style={{ marginLeft: 2 }} />
+              <Text style={styles.greenPillText} numberOfLines={1}>
+                {locationPermission === 'denied' ? 'Set location' : location.label}
+              </Text>
+              {locationLoading ? (
+                <ActivityIndicator size="small" color="#000" style={{ marginLeft: 2 }} />
+              ) : (
+                <Ionicons name="chevron-down" size={12} color="#000" style={{ marginLeft: 2 }} />
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.greenRound} activeOpacity={0.8} onPress={() => router.push('/(tabs)/explore' as never)}>
               <Ionicons name="search" size={16} color="#000" />
@@ -294,6 +341,56 @@ export default function ExploreScreen() {
           </View>
         </View>
       </SafeAreaView>
+
+      {locPickerOpen && (
+        <View style={styles.locOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setLocPickerOpen(false)}
+          />
+          <View style={styles.locSheet}>
+            <View style={styles.locHandle} />
+            <Text style={styles.locSheetTitle}>Choose location</Text>
+
+            <ScrollView
+              style={styles.locList}
+              showsVerticalScrollIndicator={false}
+              bounces={false}>
+              <TouchableOpacity
+                style={styles.locRow}
+                activeOpacity={0.8}
+                onPress={useCurrentLocation}>
+                <Ionicons name="navigate" size={18} color="#C4F27F" />
+                <Text style={styles.locRowText}>Use my current location</Text>
+                {locationLoading && <ActivityIndicator size="small" color="#C4F27F" />}
+              </TouchableOpacity>
+
+              {PRESET_LOCATIONS.map((loc) => {
+                const active =
+                  Math.abs(loc.latitude - location.latitude) < 0.01 &&
+                  Math.abs(loc.longitude - location.longitude) < 0.01;
+                return (
+                  <TouchableOpacity
+                    key={loc.label}
+                    style={styles.locRow}
+                    activeOpacity={0.8}
+                    onPress={() => pickPreset(loc)}>
+                    <Ionicons
+                      name={active ? 'location' : 'location-outline'}
+                      size={18}
+                      color={active ? '#C4F27F' : 'rgba(255,255,255,0.6)'}
+                    />
+                    <Text style={[styles.locRowText, active && styles.locRowTextActive]}>
+                      {loc.label}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={18} color="#C4F27F" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -746,6 +843,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 17,
     backgroundColor: '#C4F27F',
+  },
+  greenPillText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+    maxWidth: 110,
+  },
+  locOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 100,
+    elevation: 100,
+  },
+  locSheet: {
+    backgroundColor: '#141414',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  locHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginBottom: 14,
+  },
+  locList: { maxHeight: SCREEN_H * 0.5 },
+  locSheetTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  locRowText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  locRowTextActive: {
+    color: '#C4F27F',
   },
   greenRound: {
     width: 34,

@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Contacts from 'expo-contacts';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useReferrals } from '@/hooks/use-auth';
 
 type Tab = 'phone' | 'on-app' | 'invited';
 
@@ -19,11 +24,10 @@ type Contact = {
   name: string;
   phone: string;
   onApp: boolean;
-  invited?: boolean;
   avatarColor: string;
 };
 
-const CONTACTS: Contact[] = [];
+const AVATAR_COLORS = ['#C4F27F', '#7FB2F2', '#F2A65A', '#E57FB2', '#9B8CFF', '#5AD1C2'];
 
 function initials(name: string): string {
   return name
@@ -35,21 +39,88 @@ function initials(name: string): string {
 
 export default function ContactsScreen() {
   const router = useRouter();
+  const { data: referral } = useReferrals();
   const [tab, setTab] = useState<Tab>('phone');
   const [query, setQuery] = useState('');
-  const [invited, setInvited] = useState<Record<string, boolean>>(
-    CONTACTS.reduce((acc, c) => ({ ...acc, [c.id]: !!c.invited }), {}),
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [invited, setInvited] = useState<Record<string, boolean>>({});
+  const [permission, setPermission] = useState<'undetermined' | 'granted' | 'denied'>('undetermined');
+  const [loading, setLoading] = useState(false);
+
+  const loadContacts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setPermission('denied');
+        return;
+      }
+      setPermission('granted');
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers],
+      });
+      const mapped: Contact[] = data
+        .filter((c) => c.name && c.phoneNumbers && c.phoneNumbers.length > 0)
+        .map((c, i) => ({
+          id: c.id ?? String(i),
+          name: c.name!,
+          phone: c.phoneNumbers![0].number ?? '',
+          onApp: false, // No backend contact-matching endpoint yet.
+          avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        }));
+      setContacts(mapped);
+    } catch {
+      // Leave the list empty; the empty state explains how to connect.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Try to load contacts automatically when the screen opens.
+  useEffect(() => {
+    loadContacts();
+  }, [loadContacts]);
+
+  const invite = useCallback(
+    async (c: Contact) => {
+      const code = referral?.referralCode;
+      const message = code
+        ? `Hey ${c.name.split(' ')[0]}! Join me on Yohop to find deals nearby. Use my invite code ${code} when you sign up.`
+        : `Hey ${c.name.split(' ')[0]}! Join me on Yohop to find deals nearby.`;
+      try {
+        await Share.share({ message });
+        setInvited((p) => ({ ...p, [c.id]: true }));
+      } catch {
+        // User dismissed the share sheet — nothing to do.
+      }
+    },
+    [referral],
   );
+
+  const onSync = () => {
+    if (permission === 'denied') {
+      Alert.alert(
+        'Contacts access off',
+        'Enable contacts permission in Settings to find friends from your phonebook.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+    loadContacts();
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return CONTACTS.filter((c) => {
+    return contacts.filter((c) => {
       if (tab === 'on-app' && !c.onApp) return false;
       if (tab === 'invited' && !invited[c.id]) return false;
       if (q && !c.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [tab, query, invited]);
+  }, [tab, query, invited, contacts]);
 
   const grouped = useMemo(() => {
     const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
@@ -60,7 +131,8 @@ export default function ContactsScreen() {
     }, {});
   }, [filtered]);
 
-  const onAppCount = CONTACTS.filter((c) => c.onApp).length;
+  const onAppCount = contacts.filter((c) => c.onApp).length;
+  const invitedCount = contacts.filter((c) => invited[c.id]).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -72,8 +144,12 @@ export default function ContactsScreen() {
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Contacts</Text>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => Alert.alert('Sync Contacts', 'Contact sync requires permission to read your contacts. This feature is coming soon.', [{ text: 'OK' }])}>
-          <Text style={styles.syncLink}>Sync</Text>
+        <TouchableOpacity activeOpacity={0.7} onPress={onSync}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#C4F27F" />
+          ) : (
+            <Text style={styles.syncLink}>Sync</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -96,13 +172,14 @@ export default function ContactsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
         contentContainerStyle={styles.tabsRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'phone' && styles.tabActive]}
           onPress={() => setTab('phone')}
           activeOpacity={0.85}>
           <Text style={[styles.tabText, tab === 'phone' && styles.tabTextActive]}>
-            Phone ({CONTACTS.length})
+            Phone ({contacts.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -118,7 +195,7 @@ export default function ContactsScreen() {
           onPress={() => setTab('invited')}
           activeOpacity={0.85}>
           <Text style={[styles.tabText, tab === 'invited' && styles.tabTextActive]}>
-            Invited
+            Invited ({invitedCount})
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -126,17 +203,28 @@ export default function ContactsScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.banner}>
-          <View style={styles.bannerIcon}>
-            <Ionicons name="people" size={18} color="#C4F27F" />
+        {contacts.length > 0 && (
+          <View style={styles.banner}>
+            <View style={styles.bannerIcon}>
+              <Ionicons name="people" size={18} color="#C4F27F" />
+            </View>
+            <Text style={styles.bannerText}>
+              {contacts.length} contacts found · invite them to Yohop
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                const code = referral?.referralCode;
+                Share.share({
+                  message: code
+                    ? `Join me on Yohop to find deals nearby! Use my invite code ${code} when you sign up.`
+                    : 'Join me on Yohop to find deals nearby!',
+                });
+              }}>
+              <Text style={styles.bannerLink}>Invite</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.bannerText}>
-            {onAppCount} contacts already on the app
-          </Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.bannerLink}>Add</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
         {Object.entries(grouped).map(([letter, items]) => (
           <View key={letter}>
@@ -170,9 +258,7 @@ export default function ContactsScreen() {
                   <TouchableOpacity
                     style={styles.inviteBtn}
                     activeOpacity={0.85}
-                    onPress={() =>
-                      setInvited((p) => ({ ...p, [c.id]: true }))
-                    }>
+                    onPress={() => invite(c)}>
                     <Ionicons name="person-add-outline" size={14} color="#C4F27F" />
                   </TouchableOpacity>
                 )}
@@ -181,17 +267,32 @@ export default function ContactsScreen() {
           </View>
         ))}
 
-        {CONTACTS.length === 0 && (
+        {contacts.length === 0 && !loading && (
           <View style={styles.comingSoon}>
             <Ionicons name="call-outline" size={40} color="rgba(255,255,255,0.2)" />
-            <Text style={styles.comingSoonTitle}>Contacts sync coming soon</Text>
-            <Text style={styles.comingSoonSub}>
-              Connect your phone contacts to find friends already using the app.
+            <Text style={styles.comingSoonTitle}>
+              {permission === 'denied' ? 'Contacts access needed' : 'No contacts found'}
             </Text>
+            <Text style={styles.comingSoonSub}>
+              {permission === 'denied'
+                ? 'Allow contacts access to find friends and invite them to Yohop.'
+                : 'Connect your phone contacts to find and invite friends.'}
+            </Text>
+            <TouchableOpacity style={styles.connectBtn} activeOpacity={0.85} onPress={onSync}>
+              <Text style={styles.connectBtnText}>
+                {permission === 'denied' ? 'Open settings' : 'Connect contacts'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {CONTACTS.length > 0 && filtered.length === 0 && (
+        {loading && contacts.length === 0 && (
+          <View style={styles.comingSoon}>
+            <ActivityIndicator color="#C4F27F" />
+          </View>
+        )}
+
+        {contacts.length > 0 && filtered.length === 0 && (
           <Text style={styles.empty}>No contacts in this view.</Text>
         )}
       </ScrollView>
@@ -234,6 +335,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#fff',
   },
+  tabsScroll: { flexGrow: 0 },
   tabsRow: { paddingHorizontal: 14, gap: 8, paddingBottom: 8 },
   tab: {
     paddingHorizontal: 14,
@@ -386,5 +488,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
+  },
+  connectBtn: {
+    marginTop: 18,
+    backgroundColor: '#C4F27F',
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+  },
+  connectBtnText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

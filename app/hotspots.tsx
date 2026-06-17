@@ -205,6 +205,7 @@ function BountiesView({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
         contentContainerStyle={styles.bountyFiltersRow}>
         <View style={[styles.filterPill, styles.filterPillCount]}>
           <Text style={styles.filterPillCountText}>{rows.length} nearby</Text>
@@ -923,6 +924,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 10,
   },
+  filterScroll: { flexGrow: 0 },
   bountyFiltersRow: {
     gap: 6,
     paddingRight: 12,

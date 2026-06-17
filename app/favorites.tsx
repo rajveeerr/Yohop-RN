@@ -85,6 +85,7 @@ export default function FavoritesScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filtersScroll}
         contentContainerStyle={styles.filtersRow}>
         {FILTERS.map((f) => (
           <TouchableOpacity
@@ -180,6 +181,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#fff',
   },
+  filtersScroll: { flexGrow: 0 },
   filtersRow: {
     paddingHorizontal: 14,
     gap: 8,

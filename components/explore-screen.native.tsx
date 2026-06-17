@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     ScrollView,
@@ -10,17 +10,14 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { MapType, PROVIDER_DEFAULT } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocation } from '@/hooks/use-location';
 
 type TopTab = 'Hot Spots' | 'Leaderboard' | 'Friends';
+type MapLayer = 'light' | 'dark' | 'satellite';
 
-const INITIAL_REGION = {
-  latitude: 40.7308,
-  longitude: -73.9869,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
-};
+const CENTER = { lat: 40.7308, lng: -73.9869, zoom: 13 };
 
 
 const FILTER_CHIPS: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -30,164 +27,119 @@ const FILTER_CHIPS: { key: string; label: string; icon: keyof typeof Ionicons.gl
   { key: 'restaurants', label: 'Restaurants', icon: 'restaurant-outline' },
 ];
 
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
-  {
-    featureType: 'administrative.country',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#4b6878' }],
-  },
-  {
-    featureType: 'administrative.land_parcel',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#64779e' }],
-  },
-  {
-    featureType: 'administrative.province',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#4b6878' }],
-  },
-  {
-    featureType: 'landscape.man_made',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#334e87' }],
-  },
-  {
-    featureType: 'landscape.natural',
-    elementType: 'geometry',
-    stylers: [{ color: '#023e58' }],
-  },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#6f9ba5' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#1d2c4d' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'geometry.fill',
-    stylers: [{ color: '#023e58' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#3C7680' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#304a7d' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#98a5be' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#1d2c4d' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#2c6675' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#255763' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#b0d5ce' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#023e58' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#98a5be' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#1d2c4d' }],
-  },
-  {
-    featureType: 'transit.line',
-    elementType: 'geometry.fill',
-    stylers: [{ color: '#283d6a' }],
-  },
-  {
-    featureType: 'transit.station',
-    elementType: 'geometry',
-    stylers: [{ color: '#3a4762' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#0e1626' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#4e6d70' }],
-  },
-];
+// Keyless Leaflet + OpenStreetMap map (works in Expo Go — no native Google Maps
+// module or API key). CARTO light/dark basemaps + Esri imagery cover the three
+// modes the layer toggle cycles through.
+function buildMapHtml(): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; background: #0a1428; }
+    .leaflet-control-attribution { font-size: 9px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', { zoomControl: false, attributionControl: true })
+      .setView([${CENTER.lat}, ${CENTER.lng}], ${CENTER.zoom});
+    var layers = {
+      light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO' }),
+      dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO' }),
+      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri' })
+    };
+    var current = 'light';
+    layers[current].addTo(map);
+    window.setLayer = function (name) {
+      if (name === current || !layers[name]) return;
+      map.removeLayer(layers[current]);
+      layers[name].addTo(map);
+      current = name;
+    };
+    var userMarker = null;
+    var lastUser = null;
+    window.setCenter = function (lat, lng, zoom) {
+      lastUser = [lat, lng];
+      map.setView([lat, lng], zoom || map.getZoom());
+      if (userMarker) { userMarker.setLatLng([lat, lng]); }
+      else {
+        userMarker = L.circleMarker([lat, lng], {
+          radius: 8, color: '#fff', weight: 2, fillColor: '#C4F27F', fillOpacity: 1
+        }).addTo(map);
+      }
+    };
+    window.recenter = function () {
+      if (lastUser) map.setView(lastUser, 14);
+      else map.setView([${CENTER.lat}, ${CENTER.lng}], ${CENTER.zoom});
+    };
+  </script>
+</body>
+</html>`;
+}
 
 export default function MapScreen() {
   const router = useRouter();
-  const mapRef = useRef<MapView | null>(null);
+  const webRef = useRef<WebView | null>(null);
   const [tab, setTab] = useState<TopTab>('Friends');
-  const [mapType, setMapType] = useState<MapType>('standard');
-  const [dark, setDark] = useState(false);
+  const [layer, setLayer] = useState<MapLayer>('light');
   const [activeChips, setActiveChips] = useState<Record<string, boolean>>({});
+
+  const mapHtml = useMemo(() => buildMapHtml(), []);
+
+  const { location } = useLocation();
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
+  const centerOnUser = useCallback(() => {
+    const l = locationRef.current;
+    webRef.current?.injectJavaScript(
+      `window.setCenter && window.setCenter(${l.latitude}, ${l.longitude}, 13); true;`,
+    );
+  }, []);
+
+  useEffect(() => {
+    centerOnUser();
+  }, [location.latitude, location.longitude, centerOnUser]);
 
   const toggleChip = (k: string) =>
     setActiveChips((s) => ({ ...s, [k]: !s[k] }));
 
-  const cycleMapType = () => {
-    if (!dark && mapType === 'standard') {
-      setDark(true);
-    } else if (dark && mapType === 'standard') {
-      setDark(false);
-      setMapType('satellite');
-    } else {
-      setMapType('standard');
-    }
-  };
+  // Cycle light → dark → satellite, driving the WebView layer via injection.
+  const cycleMapType = () =>
+    setLayer((l) => {
+      const next: MapLayer =
+        l === 'light' ? 'dark' : l === 'dark' ? 'satellite' : 'light';
+      webRef.current?.injectJavaScript(
+        `window.setLayer && window.setLayer('${next}'); true;`,
+      );
+      return next;
+    });
 
-  const recenter = () => {
-    mapRef.current?.animateToRegion(INITIAL_REGION, 600);
-  };
+  const recenter = () =>
+    webRef.current?.injectJavaScript('window.recenter && window.recenter(); true;');
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle={dark || mapType === 'satellite' ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={layer === 'light' ? 'dark-content' : 'light-content'} />
 
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_DEFAULT}
-        style={StyleSheet.absoluteFillObject}
-        initialRegion={INITIAL_REGION}
-        mapType={mapType}
-        customMapStyle={dark && mapType === 'standard' ? DARK_MAP_STYLE : []}
-        showsCompass={false}
-        showsMyLocationButton={false}
-        showsPointsOfInterest={false}>
-      </MapView>
+      <WebView
+        ref={webRef}
+        style={[StyleSheet.absoluteFillObject, styles.web]}
+        originWhitelist={['*']}
+        source={{ html: mapHtml }}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState
+        scrollEnabled={false}
+        overScrollMode="never"
+        androidLayerType="hardware"
+        onLoadEnd={centerOnUser}
+      />
 
       <SafeAreaView edges={['top']} style={styles.topOverlay} pointerEvents="box-none">
         <View style={styles.tabsBar}>
@@ -276,6 +228,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a1428' },
+  web: { backgroundColor: '#0a1428' },
   topOverlay: {
     position: 'absolute',
     top: 0,
