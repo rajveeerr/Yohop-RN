@@ -20,6 +20,9 @@ export function UserDrawer({
   const { data: me } = useMe();
   const logout = useLogout();
   const merchantProfile = useStoredMerchantProfile();
+  // Treat the user as a merchant if they've onboarded on this device OR the
+  // backend says they own a merchant (e.g. signed in on a fresh install).
+  const isMerchant = !!merchantProfile || !!me?.merchantId;
   const firstName = me?.name?.split(' ')[0] ?? 'You';
   const points = me?.points ?? 0;
 
@@ -47,14 +50,6 @@ export function UserDrawer({
       onPress: () => router.push('/edit-profile'),
     },
   ];
-  if (merchantProfile) {
-    accountItems.push({
-      key: 'dashboard',
-      label: 'Dashboard',
-      icon: 'grid-outline',
-      onPress: () => router.replace('/(merchant)' as never),
-    });
-  }
   accountItems.push(
     {
       key: 'activity',
@@ -113,16 +108,15 @@ export function UserDrawer({
           icon: 'checkmark-done-outline',
           onPress: () => router.push('/redeemed'),
         },
-        ...(merchantProfile
-          ? []
-          : [
-              {
-                key: 'merchant',
-                label: 'Become a Merchant',
-                icon: 'storefront-outline' as const,
-                onPress: () => router.push('/merchant-onboarding'),
-              },
-            ]),
+        {
+          key: 'merchant',
+          label: isMerchant ? 'Open Merchant Dashboard' : 'Become a Merchant',
+          icon: 'storefront-outline' as const,
+          onPress: () =>
+            isMerchant
+              ? router.replace('/(merchant)' as never)
+              : router.push('/merchant-onboarding'),
+        },
       ],
     },
   ];

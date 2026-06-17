@@ -49,6 +49,7 @@ export default function ProfileScreen() {
   const { data: myRank } = useMyRank('all-time');
   const activity = useActivity();
   const merchantProfile = useStoredMerchantProfile();
+  const isMerchant = !!merchantProfile || !!me?.merchantId;
 
   const firstName = me?.name?.split(' ')[0] ?? 'You';
   const tier = me?.loyaltyTier ?? 'BRONZE';
@@ -107,13 +108,13 @@ export default function ProfileScreen() {
             Avid foodie, gig-goer and spa enthusiast. Delhi&apos;s Best spots,
             one tap at a time.
           </Text>
-          {merchantProfile && (
+          {isMerchant && (
             <TouchableOpacity
               style={styles.proBadge}
               activeOpacity={0.85}
               onPress={() => router.replace('/(merchant)' as never)}>
               <Ionicons name="briefcase" size={11} color="#C4F27F" />
-              <Text style={styles.proBadgeText}>Professional Dashboard</Text>
+              <Text style={styles.proBadgeText}>Open Merchant Dashboard</Text>
               <Ionicons name="chevron-forward" size={12} color="#C4F27F" />
             </TouchableOpacity>
           )}
