@@ -120,5 +120,9 @@ export async function unwrap<T>(promise: Promise<ApiResponse<T>>): Promise<T> {
   if (!res.success || res.data === null) {
     throw new Error(res.error || 'Request failed');
   }
-  return res.data;
+  // Some endpoints wrap the payload under a named key (e.g. { deal }, { bookings })
+  // so the envelope's `data` is undefined. Coerce undefined → null so React Query
+  // never receives `undefined` ("Query data cannot be undefined"). Hooks that need
+  // the real payload read the named key directly instead of relying on unwrap.
+  return (res.data ?? null) as T;
 }

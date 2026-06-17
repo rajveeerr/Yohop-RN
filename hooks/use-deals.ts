@@ -102,7 +102,20 @@ export function useNearbyDeals(params: {
 export function useDeal(id: string | undefined) {
   return useQuery({
     queryKey: ['deals', id],
-    queryFn: () => unwrap(apiGet<Deal>(`/deals/${id}`, false)),
+    // GET /deals/:id returns { success, deal, metadata } — the deal is under the
+    // `deal` key (not `data`), so unwrap() would yield undefined. Read it directly
+    // and throw on miss so the query surfaces an error instead of `undefined`.
+    queryFn: async () => {
+      const res = (await apiGet<unknown>(`/deals/${id}`, false)) as any;
+      const deal = res?.deal ?? res?.data ?? null;
+      if (!deal) throw new Error(res?.error || 'Deal not found');
+      // Detail payload nests the merchant; surface merchantId for the
+      // merchant/menu queries on the deal screen.
+      if (deal.merchantId == null && deal.merchant?.id != null) {
+        deal.merchantId = String(deal.merchant.id);
+      }
+      return deal as Deal;
+    },
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
   });
