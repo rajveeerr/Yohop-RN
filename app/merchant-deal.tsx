@@ -284,6 +284,15 @@ export default function MerchantDealEditor() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
+          {!!merchantId && me?.merchantStatus && me.merchantStatus !== 'APPROVED' && (
+            <View style={styles.pendingBanner}>
+              <Ionicons name="time-outline" size={16} color="#FFB300" />
+              <Text style={styles.pendingBannerText}>
+                Your merchant account is {me.merchantStatus.toLowerCase()}. You can
+                set up deals, but publishing is enabled once your account is approved.
+              </Text>
+            </View>
+          )}
           <Text style={styles.fieldLabel}>DEAL NAME</Text>
           <View style={styles.nameWrap}>
             <TextInput
@@ -1032,6 +1041,24 @@ const styles = StyleSheet.create({
   },
   topTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
   scroll: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 24 },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,179,0,0.1)',
+    borderColor: 'rgba(255,179,0,0.35)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+  },
+  pendingBannerText: {
+    flex: 1,
+    color: '#FFD479',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
   fieldLabel: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 10,

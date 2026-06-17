@@ -36,6 +36,8 @@ export type User = {
   emailVerified: boolean;
   createdAt: string;
   merchantId?: string | null;
+  // From /auth/me — the owning merchant's approval status, if any.
+  merchantStatus?: MerchantStatus | null;
 };
 
 export type AuthResponse = {
