@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { apiGet, unwrap } from '../services/api';
+import { apiGet } from '../services/api';
 import { tokenStorage } from '../services/storage';
 import type {
   ActivityItem,
@@ -8,22 +8,37 @@ import type {
   TableBooking,
 } from '../services/types';
 
+// Booking endpoints come back in several shapes across routes: a bare array, an
+// envelope { success, data }, or an object with a named key ({ bookings }/{ items }).
+// Dig the array out of any of them so consumers always get an array (never an
+// object that would explode on .forEach/.map).
+function pickArray<T>(res: any): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (!res || typeof res !== 'object') return [];
+  const candidates = [
+    res.bookings,
+    res.items,
+    res.results,
+    res.data,
+    res.data?.bookings,
+    res.data?.items,
+  ];
+  for (const c of candidates) if (Array.isArray(c)) return c as T[];
+  return [];
+}
+
 export function useTableBookings() {
   return useQuery({
     queryKey: ['bookings', 'tables'],
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [] as TableBooking[];
-      try {
-        return await unwrap(apiGet<TableBooking[]>('/table-booking/my-bookings'));
-      } catch {
-        // Deployed backend lists the caller's bookings at /table-booking/bookings
-        // under a `bookings` key, not the documented /table-booking/my-bookings.
-        const res = await apiGet<unknown>('/table-booking/bookings');
-        const r = res as { bookings?: unknown; data?: { bookings?: unknown } };
-        const arr = r.bookings ?? r.data?.bookings ?? [];
-        return (Array.isArray(arr) ? arr : []) as TableBooking[];
-      }
+      // Try the documented path, then the deployed /table-booking/bookings.
+      const primary = pickArray<TableBooking>(
+        await apiGet<unknown>('/table-booking/my-bookings'),
+      );
+      if (primary.length) return primary;
+      return pickArray<TableBooking>(await apiGet<unknown>('/table-booking/bookings'));
     },
     staleTime: 60 * 1000,
   });
@@ -35,14 +50,14 @@ export function useServiceBookings() {
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [] as ServiceBooking[];
-      try {
-        return await unwrap(apiGet<ServiceBooking[]>('/services/my-bookings'));
-      } catch {
-        // The documented /services/my-bookings is shadowed by /services/:id on the
-        // deployed backend and there is no consumer service-bookings route yet —
-        // degrade to empty so the profile activity list still renders.
-        return [] as ServiceBooking[];
-      }
+      // Documented path, then the deployed /users/me/service-bookings.
+      const primary = pickArray<ServiceBooking>(
+        await apiGet<unknown>('/services/my-bookings'),
+      );
+      if (primary.length) return primary;
+      return pickArray<ServiceBooking>(
+        await apiGet<unknown>('/users/me/service-bookings'),
+      );
     },
     staleTime: 60 * 1000,
   });
