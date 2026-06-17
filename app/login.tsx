@@ -35,7 +35,7 @@ export default function LoginScreen() {
 
   const onGuest = async () => {
     await guestStorage.enable();
-    router.replace('/(tabs)/explore');
+    router.replace('/(tabs)/explore' as never);
   };
 
   const onListBusiness = async () => {

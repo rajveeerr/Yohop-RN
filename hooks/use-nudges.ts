@@ -16,6 +16,7 @@ export function useNudges() {
       if (!token) return [] as RenderedNudge[];
       return unwrap(apiGet<RenderedNudge[]>('/nudges'));
     },
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -24,10 +25,17 @@ export function useDismissNudge() {
   return useMutation({
     mutationFn: (id: string) =>
       unwrap(apiPost<{ dismissed: boolean }>(`/nudges/${id}/dismiss`)),
-    onSuccess: (_, id) => {
-      qc.setQueryData<RenderedNudge[]>(['nudges'], (prev) =>
-        (prev ?? []).filter((n) => n.id !== id),
+    onMutate: async (nudgeId) => {
+      await qc.cancelQueries({ queryKey: ['nudges'] });
+      const prev = qc.getQueryData<RenderedNudge[]>(['nudges']);
+      qc.setQueryData(['nudges'], (old: RenderedNudge[] = []) =>
+        old.filter((n) => n.id !== nudgeId),
       );
+      return { prev };
     },
+    onError: (_err, _id, ctx: any) =>
+      qc.setQueryData(['nudges'], ctx?.prev),
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: ['nudges'] }),
   });
 }

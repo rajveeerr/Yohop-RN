@@ -4,12 +4,23 @@
       "PowerShell(npx expo install react-native-svg)",
       "PowerShell(npx tsc --noEmit -p . 2>&1)",
       "PowerShell(npx expo install expo-linear-gradient)",
-      "Bash(grep \"merchant\\\\|\\(tabs\\)\\\\|\\(merchant\\)\" \"/c/yohop-yashika-app/.expo/types/router.d.ts\" | head -20)",
-      "Read(//c/yohop-yashika-app/.expo/types/**)",
+      "Bash(grep \"merchant\\\\|\\(tabs\\)\\\\|\\(merchant\\)\" \"/c/yohop-app/.expo/types/router.d.ts\" | head -20)",
+      "Read(//c/yohop-app/.expo/types/**)",
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
-      "Bash(wc -l \"/c/yohop-yashika-app/app/\\(tabs\\)/index.tsx\")",
-      "Read(//c/yohop-yashika-app/app/\\(tabs\\)/**)"
+      "Bash(wc -l \"/c/yohop-app/app/\\(tabs\\)/index.tsx\")",
+      "Read(//c/yohop-app/app/\\(tabs\\)/**)",
+      "Bash(python3 *)",
+      "Skill(update-config)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git -C /Users/Rajveer/Desktop/Coding/100xDevs-Journey/Projects/Geolocation-MVP/app status --short)",
+      "Bash(git -C /Users/Rajveer/Desktop/Coding/100xDevs-Journey/Projects/Geolocation-MVP/app log --oneline -3)",
+      "Bash(grep -A 6 \"### merchant$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)",
+      "Bash(grep -A 5 \"^### auth$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)",
+      "Bash(grep -A 8 \"^### merchant$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)",
+      "Bash(grep -A 6 \"^### events$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)",
+      "Bash(grep -A 10 \"^### venue-reward$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)",
+      "Bash(grep -A 10 \"^### gamification$\" /Users/Rajveer/.claude/projects/-Users-Rajveer-Desktop-Coding-100xDevs-Journey-Projects-Geolocation-MVP-app/memory/backend-route-index.md)"
     ]
   }
 }

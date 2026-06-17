@@ -3,10 +3,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
   Image as RNImage,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -48,14 +50,6 @@ const PLACEHOLDER = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae3
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80';
 
-// Faces shown in the "CHECKING IN" stack on live deals.
-const CHECKIN_AVATARS = [
-  'https://randomuser.me/api/portraits/women/44.jpg',
-  'https://randomuser.me/api/portraits/men/32.jpg',
-  'https://randomuser.me/api/portraits/women/68.jpg',
-  'https://randomuser.me/api/portraits/men/75.jpg',
-  'https://randomuser.me/api/portraits/women/12.jpg',
-];
 
 function formatNumber(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -107,8 +101,8 @@ function dealToFeedItem(d: Deal): FeedItem {
     location: loc,
     bounty: d.isBounty && d.bountyReward ? `$${Math.round(d.bountyReward)}` : '',
     deal: d.description ?? d.title,
-    checkins: CHECKIN_AVATARS,
-    checkinCount: d.currentRedemptions ?? Math.max(0, Math.round((d.viewCount ?? 0) / 250)),
+    checkins: [],
+    checkinCount: d.currentRedemptions ?? 0,
     raw: d,
   };
 }
@@ -141,202 +135,9 @@ function eventToFeedItem(e: PlatformEvent): FeedItem {
 
 const FILTERS = ['Events', 'Bars', 'Retail'];
 
-const FALLBACK_DEALS: Deal[] = [
-  {
-    id: 'fb-1',
-    merchantId: 'fb-m1',
-    merchant: {
-      id: 'fb-m1',
-      businessName: 'The Dead Rabbit',
-      logo: null,
-      address: '30 Water St',
-      city: 'New York',
-      latitude: 40.7033,
-      longitude: -74.012,
-    },
-    title: 'Whiskey Hour',
-    description: 'Half-priced whiskey flights tonight only',
-    discountPercentage: 50,
-    discountAmount: null,
-    startTime: new Date(Date.now() - 6 * 60_000).toISOString(),
-    endTime: new Date(Date.now() + 54 * 60_000).toISOString(),
-    images: [
-      'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=1200&q=80',
-      'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=1200&q=80',
-      'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=1200&q=80',
-    ],
-    isActive: true,
-    isBounty: true,
-    bountyReward: 50,
-    isFlashSale: true,
-    currentRedemptions: 57,
-    maxRedemptions: 200,
-    viewCount: 6500,
-    likeCount: 24500,
-  },
-  {
-    id: 'fb-2',
-    merchantId: 'fb-m2',
-    merchant: {
-      id: 'fb-m2',
-      businessName: 'Death & Co.',
-      logo: null,
-      address: '433 E 6th St',
-      city: 'East Village',
-      latitude: 40.7251,
-      longitude: -73.9836,
-    },
-    title: 'Classic Pepperoni Night',
-    description: 'Two-for-one pies all night long',
-    discountPercentage: 30,
-    discountAmount: null,
-    startTime: new Date(Date.now() - 15 * 60_000).toISOString(),
-    endTime: new Date(Date.now() + 30 * 60_000).toISOString(),
-    images: [
-      'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=1200&q=80',
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&q=80',
-    ],
-    isActive: true,
-    isBounty: false,
-    bountyReward: null,
-    isFlashSale: false,
-    currentRedemptions: null,
-    maxRedemptions: null,
-    viewCount: 4200,
-    likeCount: 18100,
-  },
-  {
-    id: 'fb-3',
-    merchantId: 'fb-m3',
-    merchant: {
-      id: 'fb-m3',
-      businessName: 'Trick Dog',
-      logo: null,
-      address: '3010 20th St',
-      city: 'San Francisco',
-      latitude: 37.759,
-      longitude: -122.413,
-    },
-    title: 'Gourmet Burger Fest',
-    description: 'Limited combos this weekend',
-    discountPercentage: 25,
-    discountAmount: null,
-    startTime: new Date(Date.now() + 24 * 3600_000).toISOString(),
-    endTime: new Date(Date.now() + 30 * 3600_000).toISOString(),
-    images: [
-      'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=1200&q=80',
-      'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&q=80',
-      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80',
-    ],
-    isActive: true,
-    isBounty: true,
-    bountyReward: 40,
-    isFlashSale: false,
-    currentRedemptions: null,
-    maxRedemptions: null,
-    viewCount: 9100,
-    likeCount: 31700,
-  },
-  {
-    id: 'fb-4',
-    merchantId: 'fb-m4',
-    merchant: {
-      id: 'fb-m4',
-      businessName: 'Kimball House',
-      logo: null,
-      address: '303 E Howard Ave',
-      city: 'Decatur',
-      latitude: 33.7748,
-      longitude: -84.295,
-    },
-    title: "Chef's Steakhouse Tasting",
-    description: 'Five-course chef tasting menu',
-    discountPercentage: 40,
-    discountAmount: null,
-    startTime: new Date(Date.now() - 30 * 60_000).toISOString(),
-    endTime: new Date(Date.now() + 75 * 60_000).toISOString(),
-    images: [
-      'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=1200&q=80',
-      'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&q=80',
-    ],
-    isActive: true,
-    isBounty: true,
-    bountyReward: 75,
-    isFlashSale: true,
-    currentRedemptions: null,
-    maxRedemptions: null,
-    viewCount: 12000,
-    likeCount: 45900,
-  },
-];
-
-const FALLBACK_EVENTS: PlatformEvent[] = [
-  {
-    id: 'fb-e1',
-    title: 'Sabrina Carpenter — Live in Brooklyn',
-    type: 'PARTY',
-    status: 'PUBLISHED',
-    venue: 'Barclays Center',
-    address: '620 Atlantic Ave',
-    city: 'Brooklyn',
-    state: 'NY',
-    latitude: 40.6826,
-    longitude: -73.9754,
-    startDate: new Date(Date.now() + 7 * 86400_000).toISOString(),
-    endDate: new Date(Date.now() + 7 * 86400_000 + 3 * 3600_000).toISOString(),
-    capacity: 19000,
-    images: [
-      'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80',
-      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1200&q=80',
-    ],
-    coverImage: null,
-    description: null,
-  },
-  {
-    id: 'fb-e2',
-    title: 'Indie Rock Festival',
-    type: 'FESTIVAL',
-    status: 'PUBLISHED',
-    venue: 'The Greek Theatre',
-    address: '2700 N Vermont Ave',
-    city: 'Los Angeles',
-    state: 'CA',
-    latitude: 34.1184,
-    longitude: -118.2965,
-    startDate: new Date(Date.now() + 14 * 86400_000).toISOString(),
-    endDate: new Date(Date.now() + 14 * 86400_000 + 5 * 3600_000).toISOString(),
-    capacity: 5900,
-    images: [
-      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&q=80',
-      'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1200&q=80',
-    ],
-    coverImage: null,
-    description: null,
-  },
-  {
-    id: 'fb-e3',
-    title: 'Taylor Swift Night',
-    type: 'PARTY',
-    status: 'PUBLISHED',
-    venue: 'House of Blues',
-    address: '329 N Dearborn St',
-    city: 'Chicago',
-    state: 'IL',
-    latitude: 41.8889,
-    longitude: -87.6294,
-    startDate: new Date(Date.now() + 4 * 86400_000).toISOString(),
-    endDate: new Date(Date.now() + 4 * 86400_000 + 3 * 3600_000).toISOString(),
-    capacity: 1500,
-    images: [
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80',
-      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1200&q=80',
-    ],
-    coverImage: null,
-    description: null,
-  },
-];
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -353,20 +154,18 @@ export default function ExploreScreen() {
   const eventsQuery = useEvents({ upcoming: true });
 
   const loading = isEvents ? eventsQuery.isLoading : dealsQuery.isLoading;
+  const refreshing = isEvents ? eventsQuery.isRefetching : dealsQuery.isRefetching;
+  const onRefresh = () => isEvents ? eventsQuery.refetch() : dealsQuery.refetch();
 
   const feed: FeedItem[] = useMemo(() => {
     if (isEvents) {
-      const live = (eventsQuery.data ?? []).map(eventToFeedItem);
-      return live.length > 0 ? live : FALLBACK_EVENTS.map(eventToFeedItem);
+      return (eventsQuery.data ?? []).map(eventToFeedItem);
     }
-    const live = (dealsQuery.data ?? []).map(dealToFeedItem);
-    const deals = live.length > 0 ? live : FALLBACK_DEALS.map(dealToFeedItem);
+    const deals = (dealsQuery.data ?? []).map(dealToFeedItem);
     if (activeFilter === 'All') return deals;
-    return deals.filter((f) => {
-      const d = f.raw as Deal;
-      const cat = d.merchant ? '' : '';
-      return cat === activeFilter || f.deal.toLowerCase().includes(activeFilter.toLowerCase());
-    });
+    return deals.filter((f) =>
+      f.deal.toLowerCase().includes(activeFilter.toLowerCase()),
+    );
   }, [isEvents, activeFilter, dealsQuery.data, eventsQuery.data]);
 
   const toggleLike = (id: string) =>
@@ -383,6 +182,13 @@ export default function ExploreScreen() {
         <View style={styles.centered}>
           <ActivityIndicator color="#C4F27F" />
         </View>
+      ) : !loading && feed.length === 0 ? (
+        <View style={styles.centered}>
+          <Ionicons name="location-outline" size={48} color="rgba(255,255,255,0.2)" />
+          <Text style={[styles.centeredText, { marginTop: 16 }]}>
+            No deals near you right now.{'\n'}Check back soon!
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={feed}
@@ -392,6 +198,7 @@ export default function ExploreScreen() {
           snapToInterval={SCREEN_H}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C4F27F" />}
           renderItem={({ item }) => (
             <FeedCard
               item={item}
@@ -465,11 +272,11 @@ export default function ExploreScreen() {
               ))}
           </ScrollView>
           <View style={styles.topRight}>
-            <TouchableOpacity style={styles.greenPill} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.greenPill} activeOpacity={0.8} onPress={() => Alert.alert('Location Filter', 'Location-based filtering coming soon.')}>
               <Ionicons name="location" size={14} color="#000" />
               <Ionicons name="chevron-down" size={12} color="#000" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.greenRound} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.greenRound} activeOpacity={0.8} onPress={() => router.push('/(tabs)/explore' as never)}>
               <Ionicons name="search" size={16} color="#000" />
             </TouchableOpacity>
           </View>

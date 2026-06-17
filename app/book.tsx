@@ -2,6 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ImageBackground,
   Modal,
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRegisterForEvent } from '@/hooks/use-event-register';
-import { useBookTable } from '@/hooks/use-table-booking';
+import { useBookTable, useTableAvailability } from '@/hooks/use-table-booking';
 
 const DATE_OPTIONS = ['10 Apr', '11 Apr', '12 Apr', '13 Apr', '14 Apr', '15 Apr'];
 const TIME_OPTIONS = ['5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM'];
@@ -62,6 +63,16 @@ export default function BookScreen() {
   const registerEvent = useRegisterForEvent(params.eventId);
   const busy = bookTable.isPending || registerEvent.isPending;
 
+  const isoDate = parseRelativeDate(date);
+  const { data: availabilitySlots, isLoading: slotsLoading } = useTableAvailability({
+    merchantId: !isEvent ? params.merchantId : undefined,
+    date: isoDate,
+    partySize: tableCount,
+  });
+  const timeOptions = availabilitySlots && availabilitySlots.length > 0
+    ? availabilitySlots.map((s) => s.time)
+    : TIME_OPTIONS;
+
   const toggleSeat = (id: string) =>
     setAddedSeats((s) => ({ ...s, [id]: !s[id] }));
 
@@ -88,7 +99,6 @@ export default function BookScreen() {
         return;
       }
       if (!isEvent && params.merchantId) {
-        const isoDate = parseRelativeDate(date);
         const result = await bookTable.mutateAsync({
           merchantId: params.merchantId,
           date: isoDate,
@@ -105,7 +115,17 @@ export default function BookScreen() {
         });
         return;
       }
-      router.push('/details');
+      router.push({
+        pathname: '/details',
+        params: {
+          merchantId: params.merchantId ?? '',
+          date: isoDate,
+          time,
+          partySize: String(tableCount),
+          title,
+          subtotal: subtotal > 0 ? String(subtotal.toFixed(2)) : '',
+        },
+      });
     } catch (e: any) {
       Alert.alert('Booking failed', e?.message ?? 'Please try again.');
     }
@@ -338,7 +358,9 @@ export default function BookScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.chipsRow}>
-                {TIME_OPTIONS.map((t) => (
+                {slotsLoading ? (
+                  <ActivityIndicator color="#C4F27F" size="small" />
+                ) : timeOptions.map((t) => (
                   <TouchableOpacity
                     key={t}
                     style={[styles.chip, time === t && styles.chipActive]}

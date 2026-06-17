@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -11,14 +12,60 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBookTable } from '@/hooks/use-table-booking';
 
 export default function DetailsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    merchantId?: string;
+    date?: string;
+    time?: string;
+    partySize?: string;
+    title?: string;
+    subtotal?: string;
+  }>();
+
   const [name, setName] = useState('');
-  const [guests, setGuests] = useState('');
-  const [time, setTime] = useState('');
+  const [guests, setGuests] = useState(params.partySize ?? '');
+  const [time, setTime] = useState(params.time ?? '');
   const [occasion, setOccasion] = useState('');
   const [useLoyalty, setUseLoyalty] = useState(false);
+
+  const bookTable = useBookTable();
+  const busy = bookTable.isPending;
+
+  const subtotal = params.subtotal ? parseFloat(params.subtotal) : 0;
+  const charges = 0.49;
+  const taxes = subtotal * 0.05;
+  const total = subtotal + charges + taxes;
+
+  const fmt = (n: number) => `US$${n.toFixed(2)}`;
+
+  const onBook = async () => {
+    if (!params.merchantId || !params.date) {
+      router.push('/booked');
+      return;
+    }
+    try {
+      const result = await bookTable.mutateAsync({
+        merchantId: params.merchantId,
+        date: params.date,
+        time: time || undefined,
+        partySize: Number(guests) || 2,
+        specialRequests: occasion || undefined,
+      });
+      router.replace({
+        pathname: '/booked',
+        params: {
+          title: params.title ?? 'Booking',
+          type: 'table',
+          confirmationCode: result.confirmationCode,
+        },
+      });
+    } catch (e: any) {
+      Alert.alert('Booking failed', e?.message ?? 'Please try again.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -39,7 +86,7 @@ export default function DetailsScreen() {
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter you name"
+          placeholder="Enter your name"
           placeholderTextColor="#6E6E6E"
           value={name}
           onChangeText={setName}
@@ -68,7 +115,7 @@ export default function DetailsScreen() {
         <Text style={styles.label}>Occasion</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter you name"
+          placeholder="Birthday, anniversary…"
           placeholderTextColor="#6E6E6E"
           value={occasion}
           onChangeText={setOccasion}
@@ -76,26 +123,26 @@ export default function DetailsScreen() {
 
         <Text style={styles.label}>Choose your waiter</Text>
         <TouchableOpacity style={styles.dropdown} activeOpacity={0.8}>
-          <Text style={styles.dropdownText}>NAME</Text>
+          <Text style={styles.dropdownText}>Any available</Text>
           <Ionicons name="chevron-down" size={16} color="#fff" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.promoRow} activeOpacity={0.8}>
-          <Ionicons name="checkmark" size={14} color="#2BB673" />
-          <View style={styles.promoTextCol}>
-            <Text style={styles.promoApplied}>Promotion applied</Text>
-            <Text style={styles.promoSaving}>You&apos;re saving US$25</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.divider} />
 
-        <PriceRow label="Subtotal" value="US$19.99" />
-        <PriceRow label="Promotion" value="-US$19.99" valueColor="#2BB673" />
-        <PriceRow label="Booking Charges" value="US$0.49" />
-        <PriceRow label="Taxes & Other fees" value="US$10.99" hasInfo />
-        <PriceRow label="Total" value="US$10.71" bold />
+        {subtotal > 0 ? (
+          <>
+            <PriceRow label="Subtotal" value={fmt(subtotal)} />
+            <PriceRow label="Booking Charges" value={fmt(charges)} />
+            <PriceRow label="Taxes & Other fees" value={fmt(taxes)} hasInfo />
+            <PriceRow label="Total" value={fmt(total)} bold />
+          </>
+        ) : (
+          <>
+            <PriceRow label="Booking Charges" value="US$0.49" />
+            <PriceRow label="Taxes & Other fees" value="—" hasInfo />
+            <PriceRow label="Total" value="—" bold />
+          </>
+        )}
 
         <TouchableOpacity
           style={styles.checkRow}
@@ -108,10 +155,11 @@ export default function DetailsScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.bookBtn}
+          style={[styles.bookBtn, busy && { opacity: 0.6 }]}
           activeOpacity={0.9}
-          onPress={() => router.push('/booked')}>
-          <Text style={styles.bookBtnText}>Book</Text>
+          disabled={busy}
+          onPress={onBook}>
+          <Text style={styles.bookBtnText}>{busy ? 'Booking…' : 'Book'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -209,34 +257,13 @@ const styles = StyleSheet.create({
     borderColor: '#2A2A2A',
   },
   dropdownText: {
-    color: '#fff',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 13,
-    fontWeight: '600',
-  },
-  promoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 4,
-  },
-  promoTextCol: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  promoApplied: {
-    color: '#2BB673',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  promoSaving: {
-    color: '#2BB673',
-    fontSize: 11,
-    marginTop: 2,
   },
   divider: {
     height: 1,
     backgroundColor: '#1F1F1F',
-    marginTop: 10,
+    marginTop: 16,
     marginBottom: 8,
   },
   priceRow: {

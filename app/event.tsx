@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   Image,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,8 +15,6 @@ import { useEvent } from '@/hooks/use-events';
 
 type Tab = 'tickets' | 'overview' | 'lineup' | 'merch';
 
-const HERO_FALLBACK =
-  'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=900&q=80';
 
 function formatPrice(n: number): string {
   return `$${n.toFixed(n % 1 === 0 ? 0 : 2)}`;
@@ -50,7 +49,7 @@ export default function EventScreen() {
   const [tickets, setTickets] = useState(2);
   const { data: event, isLoading } = useEvent(id);
 
-  const hero = event?.coverImage ?? event?.images?.[0] ?? HERO_FALLBACK;
+  const hero = event?.coverImage ?? event?.images?.[0] ?? null;
   const title = event?.title ?? (isLoading ? 'Loading…' : 'Event');
   const dateMeta = event?.startDate ? formatEventDate(event.startDate) : '';
   const locationMeta = [event?.venue, event?.city]
@@ -61,7 +60,13 @@ export default function EventScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.hero}>
-        <Image source={{ uri: hero }} style={styles.heroImg} />
+        {hero ? (
+          <Image source={{ uri: hero }} style={styles.heroImg} />
+        ) : (
+          <View style={[styles.heroImg, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="image-outline" size={40} color="rgba(255,255,255,0.2)" />
+          </View>
+        )}
         <View style={styles.heroOverlay} />
         <View style={styles.heroTopRow}>
           <TouchableOpacity
@@ -71,11 +76,11 @@ export default function EventScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8} onPress={() => Share.share({ message: `${title} — check it out on YoHop!` })}>
             <Ionicons name="share-outline" size={18} color="#fff" />
           </TouchableOpacity>
           <View style={{ width: 8 }} />
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8} onPress={() => { const mId = event?.merchant?.id; if (mId) router.push({ pathname: '/food-details', params: { merchantId: String(mId) } }); }}>
             <Ionicons name="search-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

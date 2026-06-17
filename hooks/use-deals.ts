@@ -3,6 +3,20 @@ import { apiGet, apiPost, unwrap } from '../services/api';
 import { tokenStorage } from '../services/storage';
 import type { Deal } from '../services/types';
 
+function normalizeDealList(payload: unknown): Deal[] {
+  if (Array.isArray(payload)) return payload as Deal[];
+  if (!payload || typeof payload !== 'object') return [];
+
+  const candidate =
+    (payload as { deals?: unknown }).deals ??
+    (payload as { savedDeals?: unknown }).savedDeals ??
+    (payload as { items?: unknown }).items ??
+    (payload as { results?: unknown }).results ??
+    (payload as { data?: unknown }).data;
+
+  return Array.isArray(candidate) ? (candidate as Deal[]) : [];
+}
+
 export function useDeals(params?: {
   isActive?: boolean;
   isFlashSale?: boolean;
@@ -17,7 +31,8 @@ export function useDeals(params?: {
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return useQuery({
     queryKey: ['deals', params ?? {}],
-    queryFn: () => unwrap(apiGet<Deal[]>(`/deals${suffix}`, false)),
+    queryFn: async () => normalizeDealList(await unwrap(apiGet<unknown>(`/deals${suffix}`, false))),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -33,8 +48,11 @@ export function useNearbyDeals(params: {
   if (params.radius) qs.set('radius', String(params.radius));
   return useQuery({
     queryKey: ['deals', 'nearby', params],
-    queryFn: () =>
-      unwrap(apiGet<Deal[]>(`/deals/nearby?${qs.toString()}`, false)),
+    queryFn: async () =>
+      normalizeDealList(
+        await unwrap(apiGet<unknown>(`/deals/nearby?${qs.toString()}`, false)),
+      ),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -43,6 +61,7 @@ export function useDeal(id: string | undefined) {
     queryKey: ['deals', id],
     queryFn: () => unwrap(apiGet<Deal>(`/deals/${id}`, false)),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -52,8 +71,9 @@ export function useSavedDeals() {
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [];
-      return unwrap(apiGet<Deal[]>('/users/saved-deals'));
+      return normalizeDealList(await unwrap(apiGet<unknown>('/users/saved-deals')));
     },
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -62,8 +82,19 @@ export function useToggleSavedDeal() {
   return useMutation({
     mutationFn: (dealId: string) =>
       unwrap(apiPost<{ saved: boolean }>('/users/save-deal', { dealId })),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['users', 'saved-deals'] });
+    onMutate: async (dealId) => {
+      await qc.cancelQueries({ queryKey: ['users', 'saved-deals'] });
+      const prev = qc.getQueryData<Deal[]>(['users', 'saved-deals']);
+      qc.setQueryData(['users', 'saved-deals'], (old: Deal[] = []) =>
+        old.some((d) => d.id === dealId)
+          ? old.filter((d) => d.id !== dealId)
+          : [...old, { id: dealId } as Deal],
+      );
+      return { prev };
     },
+    onError: (_err, _id, ctx: any) =>
+      qc.setQueryData(['users', 'saved-deals'], ctx?.prev),
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: ['users', 'saved-deals'] }),
   });
 }

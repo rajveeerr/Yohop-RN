@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,10 +37,10 @@ export default function FavoritesScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const { data, isLoading } = useSavedDeals();
+  const { data, isLoading, isRefetching, refetch } = useSavedDeals();
   const toggle = useToggleSavedDeal();
 
-  const deals = data ?? [];
+  const deals = Array.isArray(data) ? data : [];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -104,7 +105,8 @@ export default function FavoritesScreen() {
 
       <ScrollView
         contentContainerStyle={styles.grid}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#C4F27F" />}>
         {isLoading && filtered.length === 0 ? (
           <Text style={styles.emptyText}>Loading…</Text>
         ) : filtered.length === 0 ? (
@@ -122,7 +124,7 @@ export default function FavoritesScreen() {
                 style={styles.card}
                 activeOpacity={0.85}
                 onPress={() =>
-                  router.push({ pathname: '/deal', params: { id: d.id } })
+                  router.push({ pathname: '/deal', params: { dealId: d.id } })
                 }>
                 <Image source={{ uri: img }} style={styles.cardImg} />
                 <View style={styles.gradientOverlay} />

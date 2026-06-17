@@ -19,10 +19,6 @@ import {
 } from '@/hooks/use-deals';
 import { useMerchant, useMerchantMenu } from '@/hooks/use-merchant';
 
-const HERO_FALLBACK =
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&q=80';
-const DISH_FALLBACK =
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80';
 
 const MENU_TABS = ['Menu', 'Events', 'Catering', 'Merch', 'Ride', 'Leaders'];
 const TAGS = ['Highly Recommended', 'Spicy', 'Vegan', 'Non-Veg', 'Healthy'];
@@ -40,20 +36,22 @@ function timeUntil(dateStr: string | null | undefined): string | null {
 
 export default function DealScreen() {
   const router = useRouter();
-  const { dealId, merchantId } = useLocalSearchParams<{
+  const { dealId, merchantId, id } = useLocalSearchParams<{
     dealId?: string;
     merchantId?: string;
+    id?: string;
   }>();
+  const resolvedDealId = dealId ?? id;
 
-  const dealQ = useDeal(dealId);
+  const dealQ = useDeal(resolvedDealId);
   const merchantQ = useMerchant(merchantId ?? dealQ.data?.merchantId);
   const menuQ = useMerchantMenu(merchantId ?? dealQ.data?.merchantId);
   const savedQ = useSavedDeals();
   const toggleSaved = useToggleSavedDeal();
 
   const isLiked = useMemo(
-    () => !!savedQ.data?.some((d) => d.id === dealId),
-    [savedQ.data, dealId],
+    () => !!savedQ.data?.some((d) => d.id === resolvedDealId),
+    [savedQ.data, resolvedDealId],
   );
 
   const [offerVisible, setOfferVisible] = useState(true);
@@ -61,12 +59,13 @@ export default function DealScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [cartCount, setCartCount] = useState(0);
   const [orderMode, setOrderMode] = useState<'Tab' | 'Delivery' | 'Pickup'>('Delivery');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const deal = dealQ.data;
   const merchant = merchantQ.data;
   const menu = menuQ.data ?? [];
 
-  const hero = deal?.images?.[0] ?? merchant?.coverImage ?? HERO_FALLBACK;
+  const hero = deal?.images?.[0] ?? merchant?.coverImage ?? null;
   const heroCount = deal?.images?.length ?? 1;
   const title = merchant?.businessName ?? deal?.title ?? '';
   const description = merchant?.description ?? deal?.description ?? '';
@@ -118,7 +117,13 @@ export default function DealScreen() {
         contentContainerStyle={{ paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image source={{ uri: hero }} style={styles.heroImage} />
+          {hero ? (
+            <Image source={{ uri: hero }} style={styles.heroImage} />
+          ) : (
+            <View style={[styles.heroImage, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="image-outline" size={40} color="rgba(0,0,0,0.2)" />
+            </View>
+          )}
           <SafeAreaView edges={['top']} style={styles.heroOverlay} pointerEvents="box-none">
             <View style={styles.heroTopRow}>
               <TouchableOpacity style={styles.roundBtn} onPress={() => router.back()}>
@@ -126,8 +131,8 @@ export default function DealScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.roundBtn}
-                onPress={() => dealId && toggleSaved.mutate(dealId)}
-                disabled={!dealId || toggleSaved.isPending}>
+                onPress={() => resolvedDealId && toggleSaved.mutate(resolvedDealId)}
+                disabled={!resolvedDealId || toggleSaved.isPending}>
                 <Ionicons
                   name={isLiked ? 'heart' : 'heart-outline'}
                   size={18}
@@ -147,7 +152,14 @@ export default function DealScreen() {
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{title}</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                const mId = merchantId ?? deal?.merchantId;
+                if (mId) router.push({ pathname: '/food-details', params: { merchantId: mId } });
+              }}>
+              <Text style={styles.title}>{title}</Text>
+            </TouchableOpacity>
           </View>
 
           {!!description && <Text style={styles.description}>{description}</Text>}
@@ -175,7 +187,18 @@ export default function DealScreen() {
               <MaterialCommunityIcons name="silverware-fork-knife" size={16} color="#fff" />
               <Text style={styles.primaryBtnText}>Book a table</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              activeOpacity={0.85}
+              onPress={() =>
+                router.push({
+                  pathname: '/checkin',
+                  params: {
+                    merchantId: merchantId ?? deal?.merchantId ?? '',
+                    title,
+                  },
+                })
+              }>
               <Ionicons name="finger-print" size={16} color="#fff" />
               <Text style={styles.primaryBtnText}>Check-in Now</Text>
             </TouchableOpacity>
@@ -293,8 +316,12 @@ export default function DealScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tagsRow}>
             {TAGS.map((t) => (
-              <TouchableOpacity key={t} style={styles.tagChip} activeOpacity={0.7}>
-                <Text style={styles.tagText}>{t}</Text>
+              <TouchableOpacity
+                key={t}
+                style={[styles.tagChip, activeTag === t && styles.tagChipActive]}
+                activeOpacity={0.7}
+                onPress={() => setActiveTag(activeTag === t ? null : t)}>
+                <Text style={[styles.tagText, activeTag === t && styles.tagTextActive]}>{t}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -308,10 +335,13 @@ export default function DealScreen() {
               {filteredMenu.map((d) => (
                 <View key={d.id} style={styles.dishCard}>
                   <View style={styles.dishImageWrap}>
-                    <Image
-                      source={{ uri: d.image ?? DISH_FALLBACK }}
-                      style={styles.dishImage}
-                    />
+                    {d.image ? (
+                      <Image source={{ uri: d.image }} style={styles.dishImage} />
+                    ) : (
+                      <View style={[styles.dishImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="restaurant-outline" size={20} color="#ccc" />
+                      </View>
+                    )}
                     <TouchableOpacity
                       style={styles.dishAdd}
                       onPress={() => setCartCount((c) => c + 1)}
@@ -334,7 +364,7 @@ export default function DealScreen() {
 
       <SafeAreaView edges={['bottom']} style={styles.bottomSafe}>
         {cartCount > 0 && (
-          <TouchableOpacity style={styles.cartPill} activeOpacity={0.9}>
+          <TouchableOpacity style={styles.cartPill} activeOpacity={0.9} onPress={() => router.push('/cart')}>
             <Text style={styles.cartText}>
               {cartCount} item{cartCount > 1 ? 's' : ''} added
             </Text>
@@ -691,6 +721,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   tagText: { fontSize: 12, color: '#444' },
+  tagChipActive: { backgroundColor: '#000', borderColor: '#000' },
+  tagTextActive: { color: '#fff' },
   dishesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

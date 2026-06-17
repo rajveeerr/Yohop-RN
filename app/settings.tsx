@@ -1,17 +1,17 @@
+import { useLogout, useMe } from '@/hooks/use-auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLogout, useMe } from '@/hooks/use-auth';
 
 type RowProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -72,8 +72,8 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const firstName = me?.name?.split(' ')[0] ?? 'Yashika';
-  const email = me?.email ?? 'yashika@yohop.app';
+  const firstName = me?.name?.split(' ')[0] ?? 'Guest';
+  const email = me?.email ?? 'user@yohop.app';
   const initials = firstName.slice(0, 2).toUpperCase();
 
   return (

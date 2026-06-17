@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,76 +25,7 @@ type Friend = {
   status: 'friend' | 'request' | 'suggested';
 };
 
-const FRIENDS: Friend[] = [
-  {
-    id: '1',
-    name: 'Marcus Chen',
-    points: 4200,
-    mutuals: 8,
-    online: true,
-    venue: 'At Neon Heights',
-    avatarColor: '#AE80FF',
-    status: 'friend',
-  },
-  {
-    id: '2',
-    name: 'Sasha Grey',
-    points: 3800,
-    mutuals: 5,
-    online: true,
-    venue: 'At The Vault',
-    avatarColor: '#FFB300',
-    status: 'friend',
-  },
-  {
-    id: '3',
-    name: 'Elena Rossi',
-    points: 0,
-    mutuals: 12,
-    avatarColor: '#FF6B6B',
-    status: 'request',
-  },
-  {
-    id: '4',
-    name: 'Daniel Park',
-    points: 0,
-    mutuals: 4,
-    avatarColor: '#C4F27F',
-    status: 'request',
-  },
-  {
-    id: '5',
-    name: 'Julian Kosh',
-    points: 1840,
-    mutuals: 1,
-    avatarColor: '#7AD6FF',
-    status: 'friend',
-  },
-  {
-    id: '6',
-    name: 'Maya Theron',
-    points: 1240,
-    mutuals: 3,
-    avatarColor: '#C4F27F',
-    status: 'friend',
-  },
-  {
-    id: '7',
-    name: 'Ravi Patel',
-    points: 0,
-    mutuals: 6,
-    avatarColor: '#AE80FF',
-    status: 'suggested',
-  },
-  {
-    id: '8',
-    name: 'Nina Iyer',
-    points: 0,
-    mutuals: 2,
-    avatarColor: '#FFB300',
-    status: 'suggested',
-  },
-];
+const FRIENDS: Friend[] = [];
 
 function initials(name: string): string {
   return name
@@ -249,12 +181,13 @@ export default function FriendsScreen() {
                     <Text style={styles.name}>{f.name}</Text>
                     <Text style={styles.meta}>{f.mutuals} mutual friends</Text>
                   </View>
-                  <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85}>
+                  <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
                     <Text style={styles.acceptText}>Accept</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.ignoreBtn}
-                    activeOpacity={0.85}>
+                    activeOpacity={0.85}
+                    onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
                     <Text style={styles.ignoreText}>Ignore</Text>
                   </TouchableOpacity>
                 </View>
@@ -319,7 +252,7 @@ export default function FriendsScreen() {
                   <Text style={styles.name}>{f.name}</Text>
                   <Text style={styles.meta}>{f.mutuals} mutual friends</Text>
                 </View>
-                <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
                   <Text style={styles.acceptText}>Accept</Text>
                 </TouchableOpacity>
               </View>
@@ -346,7 +279,7 @@ export default function FriendsScreen() {
                     {f.mutuals} mutual · suggested
                   </Text>
                 </View>
-                <TouchableOpacity style={styles.addBtn} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.addBtn} activeOpacity={0.85} onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
                   <Ionicons name="person-add" size={14} color="#000" />
                 </TouchableOpacity>
               </View>
@@ -354,8 +287,32 @@ export default function FriendsScreen() {
           </View>
         )}
 
-        {filtered.length === 0 && tab !== 'all' && (
-          <Text style={styles.empty}>Nothing here.</Text>
+        {tab === 'all' && friends.length === 0 && (
+          <View style={styles.comingSoon}>
+            <Ionicons name="people-outline" size={40} color="rgba(255,255,255,0.2)" />
+            <Text style={styles.comingSoonTitle}>Friends coming soon</Text>
+            <Text style={styles.comingSoonSub}>
+              Invite friends and see where they&apos;re hanging out.
+            </Text>
+            <TouchableOpacity
+              style={styles.inviteBtn}
+              activeOpacity={0.85}
+              onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
+              <Text style={styles.inviteBtnText}>Invite Friends</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {tab === 'requests' && requests.length === 0 && (
+          <View style={styles.emptyTab}>
+            <Text style={styles.empty}>No pending requests</Text>
+          </View>
+        )}
+
+        {tab === 'suggested' && suggested.length === 0 && (
+          <View style={styles.emptyTab}>
+            <Text style={styles.empty}>No suggestions yet</Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -522,6 +479,40 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
     textAlign: 'center',
+    paddingVertical: 20,
+  },
+  emptyTab: {
     paddingVertical: 40,
+    alignItems: 'center',
+  },
+  comingSoon: {
+    alignItems: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+  },
+  comingSoonTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 16,
+  },
+  comingSoonSub: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  inviteBtn: {
+    marginTop: 20,
+    backgroundColor: '#C4F27F',
+    borderRadius: 22,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  inviteBtnText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

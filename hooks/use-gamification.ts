@@ -16,6 +16,7 @@ export function useGamificationProfile() {
       if (!token) return null;
       return unwrap(apiGet<GamificationProfile>('/gamification/profile'));
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -23,6 +24,7 @@ export function useAchievements() {
   return useQuery({
     queryKey: ['gamification', 'achievements'],
     queryFn: () => unwrap(apiGet<Achievement[]>('/gamification/achievements')),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -36,6 +38,7 @@ export function useAchievementProgress() {
         apiGet<UserAchievement[]>('/gamification/achievements/progress'),
       );
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -47,5 +50,6 @@ export function useCoinTransactions() {
       if (!token) return [] as CoinTransaction[];
       return unwrap(apiGet<CoinTransaction[]>('/gamification/transactions'));
     },
+    staleTime: 5 * 60 * 1000,
   });
 }

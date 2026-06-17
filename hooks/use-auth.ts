@@ -5,6 +5,16 @@ import type { AuthResponse, User } from '../services/types';
 
 export const ME_QUERY_KEY = ['auth', 'me'] as const;
 
+type LoginResponse = {
+  message: string;
+  token: string;
+};
+
+type RegisterResponse = {
+  message: string;
+  user: User;
+};
+
 export function useMe() {
   return useQuery({
     queryKey: ME_QUERY_KEY,
@@ -23,14 +33,15 @@ export function useLogin() {
   return useMutation({
     mutationFn: async (payload: { email: string; password: string }) => {
       const res = await unwrap(
-        apiPost<AuthResponse>('/auth/login', payload, false),
+        apiPost<LoginResponse>('/auth/login', payload, false),
       );
       await tokenStorage.set(res.token);
+      const me = await unwrap(apiGet<User>('/auth/me'));
       await guestStorage.disable();
-      return res;
+      return me;
     },
-    onSuccess: (res) => {
-      qc.setQueryData(ME_QUERY_KEY, res.user);
+    onSuccess: (me) => {
+      qc.setQueryData(ME_QUERY_KEY, me);
     },
   });
 }
@@ -44,16 +55,31 @@ export function useRegister() {
       password: string;
       referralCode?: string;
     }) => {
-      const res = await unwrap(
-        apiPost<AuthResponse>('/auth/register', payload, false),
+      await unwrap(
+        apiPost<RegisterResponse>('/auth/register', payload, false),
       );
-      await tokenStorage.set(res.token);
+      const login = await unwrap(
+        apiPost<LoginResponse>('/auth/login', {
+          email: payload.email,
+          password: payload.password,
+        }, false),
+      );
+      await tokenStorage.set(login.token);
+      const me = await unwrap(apiGet<User>('/auth/me'));
       await guestStorage.disable();
-      return res;
+      return me;
     },
-    onSuccess: (res) => {
-      qc.setQueryData(ME_QUERY_KEY, res.user);
+    onSuccess: (me) => {
+      qc.setQueryData(ME_QUERY_KEY, me);
     },
+  });
+}
+
+export function useReferrals() {
+  return useQuery({
+    queryKey: ['referrals'],
+    queryFn: () => unwrap(apiGet<{ referralCode: string; referralCount: number }>('/users/referrals')),
+    staleTime: 2 * 60 * 1000,
   });
 }
 

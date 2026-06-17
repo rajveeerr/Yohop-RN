@@ -18,6 +18,7 @@ export function useNearbyVenueRewards(params?: {
       if (!token) return [] as VenueReward[];
       return unwrap(apiGet<VenueReward[]>(`/venue-rewards/nearby${suffix}`));
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -29,6 +30,7 @@ export function useMyVenueClaims() {
       if (!token) return [] as VenueRewardClaim[];
       return unwrap(apiGet<VenueRewardClaim[]>('/venue-rewards/my-claims'));
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

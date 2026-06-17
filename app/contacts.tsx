@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,15 +23,7 @@ type Contact = {
   avatarColor: string;
 };
 
-const CONTACTS: Contact[] = [
-  { id: '1', name: 'Arjun Mehta', phone: '+91 91456 42316', onApp: false, avatarColor: '#C4F27F' },
-  { id: '2', name: 'Anika Patel', phone: '+91 89887 75986', onApp: true, avatarColor: '#AE80FF' },
-  { id: '3', name: 'Dev Sharma', phone: '+91 91334 56716', onApp: false, avatarColor: '#FFB300' },
-  { id: '4', name: 'Kriti Gupta', phone: '+91 93460 02046', onApp: true, avatarColor: '#FF6B6B' },
-  { id: '5', name: 'Mihir Rao', phone: '+91 81954 32106', onApp: false, avatarColor: '#7AD6FF', invited: true },
-  { id: '6', name: 'Aarav Singh', phone: '+91 99110 22334', onApp: false, avatarColor: '#C4F27F' },
-  { id: '7', name: 'Riya Nair', phone: '+91 90120 88321', onApp: true, avatarColor: '#AE80FF' },
-];
+const CONTACTS: Contact[] = [];
 
 function initials(name: string): string {
   return name
@@ -79,7 +72,7 @@ export default function ContactsScreen() {
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Contacts</Text>
-        <TouchableOpacity activeOpacity={0.7}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => Alert.alert('Sync Contacts', 'Contact sync requires permission to read your contacts. This feature is coming soon.', [{ text: 'OK' }])}>
           <Text style={styles.syncLink}>Sync</Text>
         </TouchableOpacity>
       </View>
@@ -188,7 +181,17 @@ export default function ContactsScreen() {
           </View>
         ))}
 
-        {filtered.length === 0 && (
+        {CONTACTS.length === 0 && (
+          <View style={styles.comingSoon}>
+            <Ionicons name="call-outline" size={40} color="rgba(255,255,255,0.2)" />
+            <Text style={styles.comingSoonTitle}>Contacts sync coming soon</Text>
+            <Text style={styles.comingSoonSub}>
+              Connect your phone contacts to find friends already using the app.
+            </Text>
+          </View>
+        )}
+
+        {CONTACTS.length > 0 && filtered.length === 0 && (
           <Text style={styles.empty}>No contacts in this view.</Text>
         )}
       </ScrollView>
@@ -365,5 +368,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 40,
+  },
+  comingSoon: {
+    alignItems: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+  },
+  comingSoonTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 16,
+  },
+  comingSoonSub: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
 });

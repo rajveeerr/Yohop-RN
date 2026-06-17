@@ -31,8 +31,16 @@ export default function CheckinCompleteScreen() {
     eventId?: string;
     title?: string;
     tickets?: string;
+    pointsAwarded?: string;
+    streakDays?: string;
+    rewardTitle?: string;
+    rewardDesc?: string;
   }>();
   const ticketsCount = Math.max(1, Number(params.tickets || '1'));
+  const pointsAwarded = Number(params.pointsAwarded ?? 0);
+  const streakDays = Number(params.streakDays ?? 0);
+  const rewardTitle = params.rewardTitle || '';
+  const rewardDesc = params.rewardDesc || '';
 
   const scale = useRef(new Animated.Value(0.6)).current;
   const ring = useRef(new Animated.Value(0)).current;
@@ -154,27 +162,44 @@ export default function CheckinCompleteScreen() {
           )}
         </Animated.View>
 
-        <Text style={styles.title}>You’re checked in!</Text>
+        <Text style={styles.title}>You're checked in!</Text>
         <Text style={styles.sub}>
-          Enjoy the show. Doors open at 5:00 PM.{'\n'}
-          Have an amazing time.
+          {pointsAwarded > 0
+            ? `+${pointsAwarded} points earned${streakDays > 0 ? ` - ${streakDays}-day streak` : ''}`
+            : 'Have an amazing time.'}
         </Text>
 
-        <View style={styles.surpriseCard}>
-          <Text style={styles.surpriseTag}>SURPRISE FOR YOU</Text>
-          <Text style={styles.surpriseTitle}>Free drink at Bar 3</Text>
-          <Text style={styles.surpriseText}>
-            First round is on us. Show this screen to the bartender at Bar 3
-            before the opening act.
-          </Text>
-          <View style={styles.drinkRow}>
-            <View style={styles.drinkPill}>
-              <Ionicons name="wine" size={13} color="#C4F27F" />
-              <Text style={styles.drinkText}>Drink -88</Text>
+        {rewardTitle ? (
+          <View style={styles.surpriseCard}>
+            <Text style={styles.surpriseTag}>REWARD UNLOCKED</Text>
+            <Text style={styles.surpriseTitle}>{rewardTitle}</Text>
+            {rewardDesc ? (
+              <Text style={styles.surpriseText}>{rewardDesc}</Text>
+            ) : null}
+            <View style={styles.drinkRow}>
+              <View style={styles.drinkPill}>
+                <Ionicons name="gift-outline" size={13} color="#C4F27F" />
+                <Text style={styles.drinkText}>Show to staff</Text>
+              </View>
             </View>
-            <Text style={styles.validText}>Valid until 6:45 PM</Text>
           </View>
-        </View>
+        ) : pointsAwarded > 0 ? (
+          <View style={styles.surpriseCard}>
+            <Text style={styles.surpriseTag}>POINTS EARNED</Text>
+            <Text style={styles.surpriseTitle}>+{pointsAwarded} points added</Text>
+            {streakDays > 0 && (
+              <Text style={styles.surpriseText}>
+                You're on a {streakDays}-day check-in streak. Keep it up!
+              </Text>
+            )}
+            <View style={styles.drinkRow}>
+              <View style={styles.drinkPill}>
+                <Ionicons name="flash" size={13} color="#C4F27F" />
+                <Text style={styles.drinkText}>Streak: {streakDays} days</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.footer}>

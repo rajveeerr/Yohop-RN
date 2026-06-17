@@ -32,6 +32,7 @@ export function useTableAvailability(params: {
         ),
       ),
     enabled: !!merchantId,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -96,6 +97,28 @@ export function useConfirmBooking() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bookings', 'tables'] });
+    },
+  });
+}
+
+export function useMerchantBookings() {
+  return useQuery({
+    queryKey: ['merchant-bookings'],
+    queryFn: () =>
+      unwrap(apiGet<TableBooking[]>('/table-booking/merchant/bookings', true)),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useUpdateMerchantBookingStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, status }: { bookingId: string; status: string }) =>
+      unwrap(
+        apiPut<TableBooking>(`/table-booking/merchant/bookings/${bookingId}/status`, { status }),
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['merchant-bookings'] });
     },
   });
 }

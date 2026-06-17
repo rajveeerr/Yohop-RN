@@ -23,15 +23,6 @@ const HERO_FALLBACK =
 const DISH_FALLBACK =
   'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80';
 
-const CATEGORY_FALLBACK = [
-  'All',
-  'Happy Hours',
-  'Daily',
-  'Kids',
-  'Snacks',
-  'Italian',
-  'Chinese',
-];
 
 type OrderMode = 'Tab' | 'Delivery' | 'Pickup';
 
@@ -96,7 +87,7 @@ export default function FoodDetailsScreen() {
     const set = new Set<string>();
     menu.forEach((m) => m.category && set.add(m.category));
     const list = Array.from(set);
-    return list.length > 0 ? ['All', ...list] : CATEGORY_FALLBACK;
+    return ['All', ...list];
   }, [menu]);
 
   const filteredMenu = useMemo<MenuItem[]>(() => {

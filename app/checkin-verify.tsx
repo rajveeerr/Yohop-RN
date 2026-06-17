@@ -41,13 +41,14 @@ export default function CheckinVerifyScreen() {
 
   const onCheckIn = async () => {
     try {
+      let result: any = null;
       if (params.eventId) {
-        await eventCheckIn.mutateAsync({
+        result = await eventCheckIn.mutateAsync({
           latitude: location.latitude,
           longitude: location.longitude,
         });
       } else if (params.merchantId) {
-        await userCheckIn.mutateAsync({
+        result = await userCheckIn.mutateAsync({
           merchantId: params.merchantId,
           latitude: location.latitude,
           longitude: location.longitude,
@@ -59,6 +60,10 @@ export default function CheckinVerifyScreen() {
           eventId: params.eventId ?? '',
           title,
           tickets: String(ticketsCount),
+          pointsAwarded: String(result?.pointsAwarded ?? 0),
+          streakDays: String(result?.streak?.current ?? 0),
+          rewardTitle: result?.checkInReward?.name ?? '',
+          rewardDesc: result?.checkInReward?.description ?? '',
         },
       });
     } catch (e: any) {

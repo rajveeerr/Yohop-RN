@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -48,7 +49,7 @@ export default function RewardsScreen() {
   const [tab, setTab] = useState<Tab>('rewards');
   const { data: me } = useMe();
   const { data: stats } = useProfileStats();
-  const { data: gam } = useGamificationProfile();
+  const { data: gam, isRefetching: gamRefetching, refetch: refetchGam } = useGamificationProfile();
   const { data: streakRewards } = useStreakRewards();
   const { data: achievements, isLoading: achLoading } = useAchievementProgress();
   const { location } = useLocation();
@@ -79,12 +80,18 @@ export default function RewardsScreen() {
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topTitle}>Your Rewards</Text>
-        <View style={styles.iconBtn} />
+        <TouchableOpacity
+          style={styles.iconBtn}
+          activeOpacity={0.8}
+          onPress={() => router.push('/redeemed')}>
+          <Ionicons name="receipt-outline" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={gamRefetching} onRefresh={refetchGam} tintColor="#C4F27F" />}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.totalValue}>{totalPoints.toLocaleString()}</Text>
