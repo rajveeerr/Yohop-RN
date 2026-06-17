@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SectionHeader } from '@/components/section-header';
 import { useMe } from '@/hooks/use-auth';
 import { useDeal } from '@/hooks/use-deals';
@@ -141,10 +142,14 @@ export default function MerchantDealEditor() {
     existing?.images?.[0] ?? null,
   );
   const [dealTime, setDealTime] = useState<DealTime>('midday');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [picker, setPicker] = useState<{
+    field: 'startDate' | 'endDate' | 'startTime' | 'endTime';
+    mode: 'date' | 'time';
+  } | null>(null);
   const [duration, setDuration] = useState<Duration>('1hr');
   const [maxRedemptions, setMaxRedemptions] = useState('50');
   const [recurringDays, setRecurringDays] = useState<Set<string>>(new Set(['MO']));
@@ -164,23 +169,27 @@ export default function MerchantDealEditor() {
 
   const canPublish = dealName.trim().length > 0 && !!merchantId;
 
-  const buildPayload = (publish: boolean): Partial<Deal> => {
-    const payload: Partial<Deal> = {
-      title: dealName,
+  const buildPayload = () => {
+    const now = new Date();
+    // Combine the chosen date + time; backend requires a future start and a
+    // valid range, so coerce sensible defaults if the merchant left them blank.
+    let start = combineDateTime(startDate, startTime) ?? new Date(now.getTime() + 5 * 60_000);
+    if (start.getTime() < now.getTime()) start = new Date(now.getTime() + 5 * 60_000);
+    let end = combineDateTime(endDate, endTime) ?? new Date(start.getTime() + 30 * 86_400_000);
+    if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 30 * 86_400_000);
+
+    const payload: any = {
+      title: dealName.trim(),
       description: description || null,
-      images: heroUri ? [heroUri] : [],
-      isActive: publish,
-      isFlashSale: false,
-      isBounty,
-      bountyReward: isBounty ? Number(pointsX) * 10 : null,
-      maxRedemptions: maxRedemptions ? Number(maxRedemptions) : null,
-      discountPercentage: isDiscount && discountPct ? Number(discountPct) : null,
+      activeDateRange: { startDate: start.toISOString(), endDate: end.toISOString() },
+      imageUrls: heroUri && /^https?:\/\//.test(heroUri) ? [heroUri] : [],
+      maxRedemptions: maxRedemptions ? Number(maxRedemptions) : undefined,
     };
-    if (startDate || startTime) {
-      payload.startTime = combineDateTime(startDate, startTime);
-    }
-    if (endDate || endTime) {
-      payload.endTime = combineDateTime(endDate, endTime);
+    // The backend needs at least one offer field.
+    if (isDiscount && discountPct) {
+      payload.discountPercentage = Number(discountPct);
+    } else {
+      payload.customOfferDisplay = previewLine || dealName;
     }
     return payload;
   };
@@ -191,9 +200,9 @@ export default function MerchantDealEditor() {
       return;
     }
     try {
-      const payload = buildPayload(publish);
+      const payload = buildPayload();
       if (id) {
-        await updateDeal.mutateAsync({ dealId: id, ...payload });
+        await updateDeal.mutateAsync({ dealId: id, ...(payload as any) });
       } else {
         await createDeal.mutateAsync(payload);
       }
@@ -597,57 +606,33 @@ export default function MerchantDealEditor() {
           )}
 
           <View style={styles.rowGroup}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>START DATE</Text>
-              <View style={styles.input}>
-                <TextInput
-                  style={styles.inputText}
-                  value={startDate}
-                  onChangeText={setStartDate}
-                  placeholder="MM/DD/YYYY"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-              </View>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>END DATE</Text>
-              <View style={styles.input}>
-                <TextInput
-                  style={styles.inputText}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="MM/DD/YYYY"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-              </View>
-            </View>
+            <PickerField
+              label="START DATE"
+              value={fmtDate(startDate)}
+              placeholder="MM/DD/YYYY"
+              onPress={() => setPicker({ field: 'startDate', mode: 'date' })}
+            />
+            <PickerField
+              label="END DATE"
+              value={fmtDate(endDate)}
+              placeholder="MM/DD/YYYY"
+              onPress={() => setPicker({ field: 'endDate', mode: 'date' })}
+            />
           </View>
 
           <View style={styles.rowGroup}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>START TIME</Text>
-              <View style={styles.input}>
-                <TextInput
-                  style={styles.inputText}
-                  value={startTime}
-                  onChangeText={setStartTime}
-                  placeholder="00:00 Hours"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-              </View>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>END TIME</Text>
-              <View style={styles.input}>
-                <TextInput
-                  style={styles.inputText}
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  placeholder="00:00 Hours"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-              </View>
-            </View>
+            <PickerField
+              label="START TIME"
+              value={fmtTime(startTime)}
+              placeholder="00:00"
+              onPress={() => setPicker({ field: 'startTime', mode: 'time' })}
+            />
+            <PickerField
+              label="END TIME"
+              value={fmtTime(endTime)}
+              placeholder="00:00"
+              onPress={() => setPicker({ field: 'endTime', mode: 'time' })}
+            />
           </View>
 
           <Text style={styles.fieldLabel}>DURATION</Text>
@@ -917,6 +902,31 @@ export default function MerchantDealEditor() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {picker && (
+        <DateTimePicker
+          value={
+            (picker.field === 'startDate'
+              ? startDate
+              : picker.field === 'endDate'
+                ? endDate
+                : picker.field === 'startTime'
+                  ? startTime
+                  : endTime) ?? new Date()
+          }
+          mode={picker.mode}
+          is24Hour
+          onChange={(event, selected) => {
+            const field = picker.field;
+            setPicker(null);
+            if (event.type !== 'set' || !selected) return;
+            if (field === 'startDate') setStartDate(selected);
+            else if (field === 'endDate') setEndDate(selected);
+            else if (field === 'startTime') setStartTime(selected);
+            else setEndTime(selected);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -951,17 +961,54 @@ function SmallField({
   );
 }
 
-function combineDateTime(date: string, time: string): string | null {
+function combineDateTime(date: Date | null, time: Date | null): Date | null {
   if (!date) return null;
   const d = new Date(date);
-  if (isNaN(d.getTime())) return null;
-  if (time) {
-    const match = time.match(/^(\d{1,2}):(\d{2})/);
-    if (match) {
-      d.setHours(Number(match[1]), Number(match[2]), 0, 0);
-    }
-  }
-  return d.toISOString();
+  if (time) d.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  return d;
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+function fmtDate(d: Date | null): string {
+  return d ? `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}` : '';
+}
+function fmtTime(d: Date | null): string {
+  return d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '';
+}
+
+function PickerField({
+  label,
+  value,
+  placeholder,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity style={styles.input} activeOpacity={0.8} onPress={onPress}>
+        <Text
+          style={[
+            styles.inputText,
+            { paddingVertical: 14, color: value ? '#fff' : 'rgba(255,255,255,0.3)' },
+          ]}>
+          {value || placeholder}
+        </Text>
+        <Ionicons
+          name="chevron-down"
+          size={14}
+          color="rgba(255,255,255,0.4)"
+          style={{ paddingRight: 12 }}
+        />
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

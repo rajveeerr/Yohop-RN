@@ -8,20 +8,40 @@ import type { RenderedNudge } from '../services/types';
 // RenderedNudge (id/type/title?/body?/imageUrl?/createdAt/dismissedAt?) as a
 // best-effort display shape; consumers must tolerate missing title/body and fall
 // back to the type label.
+// The deployed /nudges + /nudges/history return UserNudge delivery records with
+// the template nested under `nudge` (so type/createdAt aren't top-level). Map any
+// shape to the RenderedNudge the screen expects.
+function toRenderedNudge(item: any): RenderedNudge {
+  const nudge = item?.nudge ?? {};
+  return {
+    id: String(item?.id ?? nudge?.id ?? Math.random()),
+    type: item?.type ?? nudge?.type ?? 'INACTIVITY',
+    title: item?.title ?? nudge?.title,
+    body: item?.body ?? item?.message ?? nudge?.body ?? nudge?.message,
+    imageUrl: item?.imageUrl ?? nudge?.imageUrl ?? null,
+    iconUrl: item?.iconUrl ?? nudge?.iconUrl ?? null,
+    createdAt:
+      item?.createdAt ?? item?.sentAt ?? item?.deliveredAt ?? new Date().toISOString(),
+    dismissedAt: item?.dismissedAt ?? null,
+  };
+}
+
 export function useNudges() {
   return useQuery({
     queryKey: ['nudges'],
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [] as RenderedNudge[];
-      // Docs (§6.16) spec GET /nudges; the deployed backend serves the rendered
-      // notification list at /nudges/history instead. Try the documented route
-      // first (auto-heals when the backend catches up), then fall back.
+      // Docs (§6.16) spec GET /nudges; the deployed backend serves the list at
+      // /nudges/history. Try the documented route first, then fall back.
+      let raw: unknown;
       try {
-        return await unwrap(apiGet<RenderedNudge[]>('/nudges'));
+        raw = await unwrap(apiGet<unknown>('/nudges'));
       } catch {
-        return await unwrap(apiGet<RenderedNudge[]>('/nudges/history'));
+        raw = await unwrap(apiGet<unknown>('/nudges/history'));
       }
+      const list = Array.isArray(raw) ? raw : ((raw as any)?.data ?? []);
+      return (Array.isArray(list) ? list : []).map(toRenderedNudge);
     },
     staleTime: 2 * 60 * 1000,
   });

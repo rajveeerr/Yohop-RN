@@ -53,13 +53,26 @@ export function useMerchantDealsList(merchantId: string | undefined) {
   });
 }
 
-export function useCreateMerchantDeal(merchantId: string | undefined) {
+// Matches the backend POST /deals contract (merchant resolved from auth; the
+// merchant must be APPROVED). Requires title + activeDateRange, and at least one
+// of discountPercentage / discountAmount / customOfferDisplay.
+export type CreateDealInput = {
+  title: string;
+  description?: string | null;
+  activeDateRange: { startDate: string; endDate: string };
+  imageUrls?: string[];
+  discountPercentage?: number;
+  discountAmount?: number;
+  customOfferDisplay?: string;
+  maxRedemptions?: number;
+};
+
+export function useCreateMerchantDeal(_merchantId?: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<Deal>) =>
-      unwrap(apiPost<Deal>(`/merchants/${merchantId}/deals`, payload)),
+    mutationFn: (payload: CreateDealInput) =>
+      unwrap(apiPost<{ deal: Deal }>('/deals', payload)),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['merchants', merchantId, 'deals'] });
       qc.invalidateQueries({ queryKey: ['deals'] });
     },
   });

@@ -84,7 +84,11 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[3]}>
         <View style={styles.headerRow}>
-          <View style={styles.avatar} />
+          {me?.avatarUrl ? (
+            <Image source={{ uri: me.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatar} />
+          )}
           <View style={styles.statsCol}>
             <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/activity')}>
               <Stat num={String(bookingsCount)} label="Bookings" />

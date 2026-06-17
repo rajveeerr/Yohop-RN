@@ -22,6 +22,7 @@ function bucketFor(type: NudgeType): 'Activity' | 'Offers' {
 
 function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
   const now = Date.now();
   const diff = Math.max(0, now - then);
   const mins = Math.floor(diff / 60000);
@@ -128,7 +129,7 @@ function NotificationIcon({ n }: { n: RenderedNudge }) {
       </View>
     );
   }
-  const icon = ICON_FOR_TYPE[n.type];
+  const icon = ICON_FOR_TYPE[n.type] ?? 'notifications-outline';
   return (
     <View style={[styles.iconWrap, styles.bookingIcon]}>
       <Ionicons name={icon} size={20} color="#C4F27F" />

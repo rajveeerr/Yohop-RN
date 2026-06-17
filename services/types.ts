@@ -21,6 +21,8 @@ export type User = {
   email: string;
   name: string | null;
   avatar: string | null;
+  // Live /auth/me and /profile return the avatar as `avatarUrl`.
+  avatarUrl?: string | null;
   phone: string | null;
   birthday: string | null;
   role: UserRole;

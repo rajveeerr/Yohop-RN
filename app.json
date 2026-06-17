@@ -50,7 +50,8 @@
         {
           "contactsPermission": "Allow yohop to access your contacts to find and invite friends."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
