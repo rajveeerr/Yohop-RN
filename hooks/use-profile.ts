@@ -14,7 +14,16 @@ export function useProfile() {
 export function useProfileStats() {
   return useQuery({
     queryKey: ['profile', 'stats'],
-    queryFn: () => unwrap(apiGet<ProfileStats>('/profile/stats')),
+    // Docs (§6.5) spec GET /profile/stats but it isn't deployed. Degrade to null
+    // rather than erroring — the profile screen reads points from /auth/me when
+    // stats are absent. (Re-points automatically if the route ships later.)
+    queryFn: async (): Promise<ProfileStats | null> => {
+      try {
+        return await unwrap(apiGet<ProfileStats>('/profile/stats'));
+      } catch {
+        return null;
+      }
+    },
     staleTime: 5 * 60 * 1000,
   });
 }

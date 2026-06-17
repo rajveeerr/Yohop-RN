@@ -14,7 +14,14 @@ export function useNudges() {
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [] as RenderedNudge[];
-      return unwrap(apiGet<RenderedNudge[]>('/nudges'));
+      // Docs (§6.16) spec GET /nudges; the deployed backend serves the rendered
+      // notification list at /nudges/history instead. Try the documented route
+      // first (auto-heals when the backend catches up), then fall back.
+      try {
+        return await unwrap(apiGet<RenderedNudge[]>('/nudges'));
+      } catch {
+        return await unwrap(apiGet<RenderedNudge[]>('/nudges/history'));
+      }
     },
     staleTime: 2 * 60 * 1000,
   });

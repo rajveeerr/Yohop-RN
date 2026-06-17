@@ -36,6 +36,38 @@ export function useDeals(params?: {
   });
 }
 
+/** Great-circle distance in km between two lat/lng points (Haversine). */
+function distanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Sort deals nearest-first relative to the given origin (no merchant coords sink last). */
+function sortByDistance(deals: Deal[], lat: number, lng: number): Deal[] {
+  return [...deals].sort((a, b) => {
+    const da =
+      a.merchant?.latitude != null && a.merchant?.longitude != null
+        ? distanceKm(lat, lng, a.merchant.latitude, a.merchant.longitude)
+        : Number.POSITIVE_INFINITY;
+    const db =
+      b.merchant?.latitude != null && b.merchant?.longitude != null
+        ? distanceKm(lat, lng, b.merchant.latitude, b.merchant.longitude)
+        : Number.POSITIVE_INFINITY;
+    return da - db;
+  });
+}
+
 export function useNearbyDeals(params: {
   latitude: number;
   longitude: number;
@@ -48,10 +80,21 @@ export function useNearbyDeals(params: {
   if (params.radius) qs.set('radius', String(params.radius));
   return useQuery({
     queryKey: ['deals', 'nearby', params],
-    queryFn: async () =>
-      normalizeDealList(
-        await unwrap(apiGet<unknown>(`/deals/nearby?${qs.toString()}`, false)),
-      ),
+    // The documented `/deals/nearby` route is currently shadowed by `/deals/:id`
+    // on the deployed backend (returns "Invalid Deal ID"). Try it first so this
+    // self-heals when the backend is fixed, then fall back to `/deals` + a
+    // client-side Haversine sort so the feed still populates nearest-first.
+    queryFn: async () => {
+      try {
+        const nearby = normalizeDealList(
+          await unwrap(apiGet<unknown>(`/deals/nearby?${qs.toString()}`, false)),
+        );
+        return nearby;
+      } catch {
+        const all = normalizeDealList(await unwrap(apiGet<unknown>('/deals', false)));
+        return sortByDistance(all, params.latitude, params.longitude);
+      }
+    },
     staleTime: 5 * 60 * 1000,
   });
 }

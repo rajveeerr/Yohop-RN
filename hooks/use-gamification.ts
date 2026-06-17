@@ -28,15 +28,43 @@ export function useAchievements() {
   });
 }
 
+// Deployed backend embeds per-user progress inside each /gamification/achievements
+// row (`userProgress: { isCompleted, completedAt }`) instead of exposing the
+// documented /gamification/achievements/progress route.
+type AchievementWithProgress = Achievement & {
+  userProgress?: { isCompleted?: boolean; completedAt?: string | null } | null;
+};
+
 export function useAchievementProgress() {
   return useQuery({
     queryKey: ['gamification', 'achievements', 'progress'],
     queryFn: async () => {
       const token = await tokenStorage.get();
       if (!token) return [] as UserAchievement[];
-      return unwrap(
-        apiGet<UserAchievement[]>('/gamification/achievements/progress'),
-      );
+      try {
+        return await unwrap(
+          apiGet<UserAchievement[]>('/gamification/achievements/progress'),
+        );
+      } catch {
+        const list = await unwrap(
+          apiGet<AchievementWithProgress[]>('/gamification/achievements'),
+        );
+        return list.map<UserAchievement>((a) => ({
+          achievementId: String(a.id),
+          achievement: {
+            id: String(a.id),
+            name: a.name,
+            type: a.type,
+            description: a.description,
+            criteria: a.criteria ?? {},
+            coinReward: a.coinReward ?? 0,
+            xpReward: a.xpReward ?? 0,
+          },
+          progress: a.userProgress?.isCompleted ? 1 : 0,
+          total: 1,
+          completedAt: a.userProgress?.completedAt ?? null,
+        }));
+      }
     },
     staleTime: 5 * 60 * 1000,
   });

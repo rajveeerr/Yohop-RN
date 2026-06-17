@@ -85,6 +85,8 @@ export type Merchant = {
   city: string | null;
   state: string | null;
   logo: string | null;
+  // Live /deals responses return the logo as `logoUrl`; keep both so either shape maps.
+  logoUrl?: string | null;
   coverImage: string | null;
   gallery: string[];
   amenities: string[];
@@ -104,9 +106,14 @@ export type Merchant = {
 export type Deal = {
   id: string;
   merchantId: string;
-  merchant?: Pick<Merchant, 'id' | 'businessName' | 'logo' | 'address' | 'city' | 'latitude' | 'longitude'>;
+  merchant?: Pick<Merchant, 'id' | 'businessName' | 'logo' | 'logoUrl' | 'address' | 'city' | 'latitude' | 'longitude'>;
   title: string;
   description: string | null;
+  // Live /deals responses return a pre-formatted label (e.g. "20% OFF", "DEAL")
+  // and `imageUrl`/`claimedBy` instead of the documented numeric/count fields.
+  offerDisplay?: string | null;
+  imageUrl?: string | null;
+  claimedBy?: { totalCount: number; visibleUsers?: unknown[] } | null;
   discountPercentage: number | null;
   discountAmount: number | null;
   startTime: string | null;

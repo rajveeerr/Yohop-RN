@@ -80,21 +80,33 @@ function formatCountdown(totalSec: number): string {
 }
 
 function dealToFeedItem(d: Deal): FeedItem {
-  const images = d.images && d.images.length > 0 ? d.images : [PLACEHOLDER];
+  const images =
+    d.images && d.images.length > 0
+      ? d.images
+      : d.imageUrl
+        ? [d.imageUrl]
+        : [PLACEHOLDER];
   const merchantName = d.merchant?.businessName ?? d.title;
   const loc =
-    d.merchant?.address && d.merchant?.city
-      ? `${d.merchant.address}, ${d.merchant.city}`
-      : d.merchant?.city ?? 'Nearby';
+    d.merchant?.address ??
+    (d.merchant?.city ?? 'Nearby');
+  // Live API returns a pre-formatted `offerDisplay` (e.g. "20% OFF"); fall back
+  // to the documented numeric `discountPercentage` if that's all we got.
+  const off =
+    d.offerDisplay && d.offerDisplay.toUpperCase() !== 'DEAL'
+      ? d.offerDisplay
+      : d.discountPercentage
+        ? `${Math.round(d.discountPercentage)}% OFF`
+        : undefined;
   return {
     id: d.id,
     kind: 'deal',
     images,
-    thumb: d.merchant?.logo ?? images[0],
+    thumb: d.merchant?.logoUrl ?? d.merchant?.logo ?? images[0],
     title: merchantName,
     views: formatNumber(d.viewCount ?? 0),
     likes: formatNumber(d.likeCount ?? 0),
-    off: d.discountPercentage ? `${Math.round(d.discountPercentage)}% OFF` : undefined,
+    off,
     timer: timeUntil(d.startTime),
     startTime: d.startTime,
     endTime: d.endTime,
@@ -102,7 +114,7 @@ function dealToFeedItem(d: Deal): FeedItem {
     bounty: d.isBounty && d.bountyReward ? `$${Math.round(d.bountyReward)}` : '',
     deal: d.description ?? d.title,
     checkins: [],
-    checkinCount: d.currentRedemptions ?? 0,
+    checkinCount: d.claimedBy?.totalCount ?? d.currentRedemptions ?? 0,
     raw: d,
   };
 }
