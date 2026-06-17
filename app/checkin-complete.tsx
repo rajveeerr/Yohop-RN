@@ -162,7 +162,7 @@ export default function CheckinCompleteScreen() {
           )}
         </Animated.View>
 
-        <Text style={styles.title}>You're checked in!</Text>
+        <Text style={styles.title}>You&apos;re checked in!</Text>
         <Text style={styles.sub}>
           {pointsAwarded > 0
             ? `+${pointsAwarded} points earned${streakDays > 0 ? ` - ${streakDays}-day streak` : ''}`
@@ -189,7 +189,7 @@ export default function CheckinCompleteScreen() {
             <Text style={styles.surpriseTitle}>+{pointsAwarded} points added</Text>
             {streakDays > 0 && (
               <Text style={styles.surpriseText}>
-                You're on a {streakDays}-day check-in streak. Keep it up!
+                You&apos;re on a {streakDays}-day check-in streak. Keep it up!
               </Text>
             )}
             <View style={styles.drinkRow}>
