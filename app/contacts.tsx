@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReferrals } from '@/hooks/use-auth';
+import { useMatchContacts, useSendFriendRequest } from '@/hooks/use-friends';
 
 type Tab = 'phone' | 'on-app' | 'invited';
 
@@ -23,7 +24,9 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   onApp: boolean;
+  userId?: number;
   avatarColor: string;
 };
 
@@ -40,10 +43,13 @@ function initials(name: string): string {
 export default function ContactsScreen() {
   const router = useRouter();
   const { data: referral } = useReferrals();
+  const matchContacts = useMatchContacts();
+  const sendRequest = useSendFriendRequest();
   const [tab, setTab] = useState<Tab>('phone');
   const [query, setQuery] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
+  const [requested, setRequested] = useState<Record<string, boolean>>({});
   const [permission, setPermission] = useState<'undetermined' | 'granted' | 'denied'>('undetermined');
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +63,7 @@ export default function ContactsScreen() {
       }
       setPermission('granted');
       const { data } = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.PhoneNumbers],
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
       });
       const mapped: Contact[] = data
         .filter((c) => c.name && c.phoneNumbers && c.phoneNumbers.length > 0)
@@ -65,16 +71,43 @@ export default function ContactsScreen() {
           id: c.id ?? String(i),
           name: c.name!,
           phone: c.phoneNumbers![0].number ?? '',
-          onApp: false, // No backend contact-matching endpoint yet.
+          email: c.emails?.[0]?.email?.toLowerCase(),
+          onApp: false,
           avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
         }));
       setContacts(mapped);
+
+      // Match contacts (by email) against app users — flags who's "On App".
+      const emails = mapped.map((c) => c.email).filter(Boolean) as string[];
+      if (emails.length) {
+        try {
+          const matches = await matchContacts.mutateAsync(emails);
+          const byEmail = new Map(matches.map((m) => [m.email.toLowerCase(), m]));
+          setContacts((prev) =>
+            prev.map((c) => {
+              const m = c.email ? byEmail.get(c.email) : undefined;
+              return m ? { ...c, onApp: true, userId: m.id } : c;
+            }),
+          );
+        } catch {
+          // Matching endpoint not deployed yet — leave everyone as off-app.
+        }
+      }
     } catch {
       // Leave the list empty; the empty state explains how to connect.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [matchContacts]);
+
+  const addFriend = useCallback(
+    (c: Contact) => {
+      if (!c.userId) return;
+      setRequested((p) => ({ ...p, [c.id]: true }));
+      sendRequest.mutate(c.userId);
+    },
+    [sendRequest],
+  );
 
   // Try to load contacts automatically when the screen opens.
   useEffect(() => {
@@ -247,9 +280,19 @@ export default function ContactsScreen() {
                   <Text style={styles.phone}>{c.phone}</Text>
                 </View>
                 {c.onApp ? (
-                  <View style={styles.addedIcon}>
-                    <Ionicons name="checkmark" size={14} color="#C4F27F" />
-                  </View>
+                  requested[c.id] ? (
+                    <View style={styles.invitedIcon}>
+                      <Ionicons name="time-outline" size={14} color="#FFB300" />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.addFriendBtn}
+                      activeOpacity={0.85}
+                      onPress={() => addFriend(c)}>
+                      <Ionicons name="person-add" size={13} color="#000" />
+                      <Text style={styles.addFriendText}>Add</Text>
+                    </TouchableOpacity>
+                  )
                 ) : invited[c.id] ? (
                   <View style={styles.invitedIcon}>
                     <Ionicons name="time-outline" size={14} color="#FFB300" />
@@ -449,6 +492,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addFriendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#C4F27F',
+  },
+  addFriendText: { color: '#000', fontSize: 11, fontWeight: '800' },
   addedIcon: {
     width: 32,
     height: 32,

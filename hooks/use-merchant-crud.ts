@@ -2,13 +2,33 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPost, apiPut, unwrap } from '../services/api';
 import type { Deal, MenuItem, Merchant } from '../services/types';
 
+// Matches the backend POST /merchants/register contract (additive fields are
+// optional). `businessCategory` is resolved server-side against the category
+// master list; `stores` can be added later from the dashboard.
+export type MerchantRegisterInput = {
+  businessName: string;
+  description?: string | null;
+  businessCategory?: string;
+  address?: string;
+  phoneNumber?: string;
+  websiteUrl?: string;
+  logoUrl?: string | null;
+  galleryUrls?: string[];
+};
+
 export function useCreateMerchant() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<Merchant>) =>
-      unwrap(apiPost<Merchant>('/merchants', payload)),
+    mutationFn: (payload: MerchantRegisterInput) =>
+      unwrap(
+        apiPost<{ message: string; merchant: Merchant }>(
+          '/merchants/register',
+          payload,
+        ),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+      qc.invalidateQueries({ queryKey: ['merchant', 'status'] });
     },
   });
 }

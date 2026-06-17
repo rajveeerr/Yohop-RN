@@ -13,11 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MerchantDrawer } from '@/components/merchant-drawer';
 import { MerchantTopBar } from '@/components/merchant-top-bar';
 import { SectionHeader } from '@/components/section-header';
-import {
-  MERCHANT_BUSINESS,
-} from '@/constants/merchant-mock';
 import { useMerchantStats } from '@/hooks/use-merchant-stats';
 import { useMe } from '@/hooks/use-auth';
+import { useMerchant } from '@/hooks/use-merchant';
 import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 
 export default function MerchantProfileScreen() {
@@ -25,6 +23,7 @@ export default function MerchantProfileScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const stored = useStoredMerchantProfile();
   const { data: me } = useMe();
+  const { data: merchant } = useMerchant(me?.merchantId ?? undefined);
   const { data: stats } = useMerchantStats(me?.merchantId ?? undefined);
 
   const derivedStats = [
@@ -46,15 +45,20 @@ export default function MerchantProfileScreen() {
     },
   ];
 
-  const bizName = stored?.businessName || MERCHANT_BUSINESS.name;
-  const handle = stored?.businessName
-    ? stored.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')
-    : MERCHANT_BUSINESS.handle;
-  const bio = stored?.businessBio ||
-    'A late-night neon-soaked club in the heart of Delhi. Curated DJs, craft cocktails, and a no-phone-on-the-floor policy. Open Wed–Sun.';
-  const address = stored?.address || 'Hauz Khas Village, Delhi';
-  const website = stored?.websiteUrl || 'neon-delhi.com';
-  const galleryImages = stored?.photos ?? [];
+  const bizName = stored?.businessName || merchant?.businessName || 'Your business';
+  const slugSource = stored?.businessName || merchant?.businessName;
+  const handle = slugSource
+    ? slugSource.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')
+    : 'business';
+  const city = merchant?.city ?? null;
+  const bio = stored?.businessBio || merchant?.description || 'No description added yet.';
+  const address = stored?.address || merchant?.address || 'No address added yet.';
+  const website = stored?.websiteUrl || merchant?.website || null;
+  const remoteLogo = merchant?.logo || merchant?.logoUrl || null;
+  const coverUri = stored?.photos?.[0] || merchant?.coverImage || merchant?.gallery?.[0] || null;
+  const galleryImages = stored?.photos?.length ? stored.photos : merchant?.gallery ?? [];
+  const amenities = stored?.amenities?.length ? stored.amenities : merchant?.amenities ?? [];
+  const vibeTags = stored?.vibeTags?.length ? stored.vibeTags : merchant?.vibeTags ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -67,8 +71,8 @@ export default function MerchantProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
-        {stored?.photos?.[0] ? (
-          <Image source={{ uri: stored.photos[0] }} style={styles.cover} />
+        {coverUri ? (
+          <Image source={{ uri: coverUri }} style={styles.cover} />
         ) : (
           <View style={[styles.cover, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
             <Ionicons name="image-outline" size={32} color="rgba(255,255,255,0.2)" />
@@ -77,17 +81,13 @@ export default function MerchantProfileScreen() {
 
         <View style={styles.header}>
           <View style={styles.logoWrap}>
-            {stored?.logoUri ? (
+            {stored?.logoUri || remoteLogo ? (
               <Image
-                source={{ uri: stored.logoUri }}
+                source={{ uri: (stored?.logoUri || remoteLogo) as string }}
                 style={styles.logoImg}
               />
             ) : (
-              <View
-                style={[
-                  styles.logo,
-                  { backgroundColor: MERCHANT_BUSINESS.logoColor },
-                ]}>
+              <View style={[styles.logo, { backgroundColor: '#C4F27F' }]}>
                 <Text style={styles.logoLetter}>
                   {bizName.charAt(0).toUpperCase()}
                 </Text>
@@ -103,7 +103,7 @@ export default function MerchantProfileScreen() {
               </View>
             </View>
             <Text style={styles.bizHandle}>
-              @{handle} · {MERCHANT_BUSINESS.city}
+              @{handle}{city ? ` · ${city}` : ''}
             </Text>
           </View>
         </View>
@@ -145,10 +145,6 @@ export default function MerchantProfileScreen() {
             <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.55)" />
             <Text style={styles.aboutMeta}>{address}</Text>
           </View>
-          <View style={styles.aboutMetaRow}>
-            <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.55)" />
-            <Text style={styles.aboutMeta}>Wed–Sun · 7:00 PM – 2:00 AM</Text>
-          </View>
           {stored?.email ? (
             <View style={styles.aboutMetaRow}>
               <Ionicons name="mail-outline" size={14} color="rgba(255,255,255,0.55)" />
@@ -161,16 +157,18 @@ export default function MerchantProfileScreen() {
               <Text style={styles.aboutMeta}>{stored.contactNumber}</Text>
             </View>
           ) : null}
-          <View style={styles.aboutMetaRow}>
-            <Ionicons name="globe-outline" size={14} color="rgba(255,255,255,0.55)" />
-            <Text style={styles.aboutMeta}>{website}</Text>
-          </View>
+          {website ? (
+            <View style={styles.aboutMetaRow}>
+              <Ionicons name="globe-outline" size={14} color="rgba(255,255,255,0.55)" />
+              <Text style={styles.aboutMeta}>{website}</Text>
+            </View>
+          ) : null}
         </View>
 
         <SectionHeader label="Amenities" />
-        {(stored?.amenities ?? []).length > 0 ? (
+        {amenities.length > 0 ? (
           <View style={styles.tagsRow}>
-            {(stored!.amenities!).map((t) => (
+            {amenities.map((t) => (
               <View key={t} style={styles.tagPill}>
                 <Text style={styles.tagPillText}>{t}</Text>
               </View>
@@ -181,9 +179,9 @@ export default function MerchantProfileScreen() {
         )}
 
         <SectionHeader label="Vibe" />
-        {(stored?.vibeTags ?? []).length > 0 ? (
+        {vibeTags.length > 0 ? (
           <View style={styles.tagsRow}>
-            {(stored!.vibeTags!).map((t) => (
+            {vibeTags.map((t) => (
               <View key={t} style={[styles.tagPill, styles.tagPillAccent]}>
                 <Text style={[styles.tagPillText, styles.tagPillTextAccent]}>{t}</Text>
               </View>

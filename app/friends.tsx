@@ -11,6 +11,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useFriends,
+  useFriendRequests,
+  useRespondFriendRequest,
+} from '@/hooks/use-friends';
 
 type Tab = 'all' | 'requests' | 'suggested';
 
@@ -23,9 +28,13 @@ type Friend = {
   venue?: string;
   avatarColor: string;
   status: 'friend' | 'request' | 'suggested';
+  friendshipId?: number;
 };
 
-const FRIENDS: Friend[] = [];
+const AVATAR_COLORS = ['#C4F27F', '#7FB2F2', '#F2A65A', '#E57FB2', '#9B8CFF', '#5AD1C2'];
+
+// No "suggested" endpoint yet — stable empty reference keeps useMemo deps clean.
+const NO_SUGGESTED: Friend[] = [];
 
 function initials(name: string): string {
   return name
@@ -45,11 +54,42 @@ export default function FriendsScreen() {
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
 
-  const friends = FRIENDS.filter((f) => f.status === 'friend');
-  const requests = FRIENDS.filter((f) => f.status === 'request');
-  const suggested = FRIENDS.filter((f) => f.status === 'suggested');
+  const { data: friendsData } = useFriends();
+  const { data: requestsData } = useFriendRequests();
+  const respond = useRespondFriendRequest();
+
+  const friends: Friend[] = useMemo(
+    () =>
+      (friendsData ?? []).map((u, i) => ({
+        id: `f-${u.id}`,
+        name: u.name ?? 'Friend',
+        points: u.points ?? 0,
+        mutuals: 0,
+        avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        status: 'friend' as const,
+      })),
+    [friendsData],
+  );
+  const requests: Friend[] = useMemo(
+    () =>
+      (requestsData ?? []).map((r, i) => ({
+        id: `r-${r.friendshipId}`,
+        name: r.name ?? 'User',
+        mutuals: 0,
+        avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        status: 'request' as const,
+        friendshipId: r.friendshipId,
+      })),
+    [requestsData],
+  );
+  const suggested = NO_SUGGESTED;
   const onlineNow = friends.filter((f) => f.online);
   const allFriends = friends.filter((f) => !f.online);
+
+  const accept = (f: Friend) =>
+    f.friendshipId && respond.mutate({ id: f.friendshipId, action: 'accept' });
+  const ignore = (f: Friend) =>
+    f.friendshipId && respond.mutate({ id: f.friendshipId, action: 'ignore' });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -179,13 +219,13 @@ export default function FriendsScreen() {
                     <Text style={styles.name}>{f.name}</Text>
                     <Text style={styles.meta}>{f.mutuals} mutual friends</Text>
                   </View>
-                  <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
+                  <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => accept(f)}>
                     <Text style={styles.acceptText}>Accept</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.ignoreBtn}
                     activeOpacity={0.85}
-                    onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
+                    onPress={() => ignore(f)}>
                     <Text style={styles.ignoreText}>Ignore</Text>
                   </TouchableOpacity>
                 </View>
@@ -248,10 +288,13 @@ export default function FriendsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{f.name}</Text>
-                  <Text style={styles.meta}>{f.mutuals} mutual friends</Text>
+                  <Text style={styles.meta}>wants to connect</Text>
                 </View>
-                <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => Alert.alert('Friends', 'Friends feature coming soon!')}>
+                <TouchableOpacity style={styles.acceptBtn} activeOpacity={0.85} onPress={() => accept(f)}>
                   <Text style={styles.acceptText}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ignoreBtn} activeOpacity={0.85} onPress={() => ignore(f)}>
+                  <Text style={styles.ignoreText}>Ignore</Text>
                 </TouchableOpacity>
               </View>
             ))}

@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/section-header';
-import { MERCHANT_BUSINESS } from '@/constants/merchant-mock';
 import { useMe } from '@/hooks/use-auth';
 import { useUpdateMerchant } from '@/hooks/use-merchant-crud';
 import { merchantStorage } from '@/services/storage';
@@ -44,26 +43,13 @@ export default function MerchantEditScreen() {
   const [category, setCategory] = useState<MerchantCategory>(
     stored?.category ?? 'restaurant',
   );
-  const [businessName, setBusinessName] = useState(
-    stored?.businessName || MERCHANT_BUSINESS.name,
-  );
-  const [bio, setBio] = useState(
-    stored?.businessBio ||
-      'A late-night neon-soaked club in the heart of Delhi. Curated DJs and craft cocktails.',
-  );
-  const [address, setAddress] = useState(
-    stored?.address || 'Hauz Khas Village, Delhi',
-  );
-  const [website, setWebsite] = useState(
-    stored?.websiteUrl || 'https://neon-delhi.com',
-  );
-  const [email, setEmail] = useState(stored?.email || 'hello@neon-delhi.com');
-  const [contact, setContact] = useState(
-    stored?.contactNumber || '+91 98765 43210',
-  );
-  const [services, setServices] = useState(
-    stored?.services || 'Live DJ, Private bookings, Bar service',
-  );
+  const [businessName, setBusinessName] = useState(stored?.businessName ?? '');
+  const [bio, setBio] = useState(stored?.businessBio ?? '');
+  const [address, setAddress] = useState(stored?.address ?? '');
+  const [website, setWebsite] = useState(stored?.websiteUrl ?? '');
+  const [email, setEmail] = useState(stored?.email ?? '');
+  const [contact, setContact] = useState(stored?.contactNumber ?? '');
+  const [services, setServices] = useState(stored?.services ?? '');
 
   const onSave = async () => {
     try {
@@ -78,6 +64,8 @@ export default function MerchantEditScreen() {
         email,
         contactNumber: contact,
         services,
+        amenities: stored?.amenities,
+        vibeTags: stored?.vibeTags,
       });
       if (me?.merchantId) {
         await updateMerchant.mutateAsync({

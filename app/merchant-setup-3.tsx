@@ -34,6 +34,14 @@ const CATEGORY_META: Record<
   other: { label: 'Other', icon: 'ellipsis-horizontal' },
 };
 
+// Maps the app's category to a backend category-master name for /merchants/register.
+const CATEGORY_TO_BUSINESS: Record<MerchantCategory, string> = {
+  restaurant: 'Food & Beverage',
+  cafe: 'Food & Beverage',
+  retail: 'Retail',
+  other: 'Other',
+};
+
 export default function MerchantSetup3Screen() {
   const router = useRouter();
   const draft = useMerchantDraft();
@@ -46,7 +54,25 @@ export default function MerchantSetup3Screen() {
   };
 
   const onSubmit = async () => {
+    if (!draft.businessName?.trim()) {
+      Alert.alert('Business name required', 'Please add your business name before submitting.');
+      return;
+    }
+    const isUrl = (u?: string | null) => !!u && /^https?:\/\//.test(u);
     try {
+      // Register on the backend first so we only mark success if it persists.
+      await createMerchant.mutateAsync({
+        businessName: draft.businessName.trim(),
+        description: draft.businessBio || null,
+        businessCategory: draft.category ? CATEGORY_TO_BUSINESS[draft.category] : 'Other',
+        address: draft.address,
+        phoneNumber: draft.contactNumber || undefined,
+        websiteUrl: draft.websiteUrl || undefined,
+        // Logo/gallery from the picker are local file:// URIs — only send real
+        // hosted URLs until image upload is wired (avoids storing invalid URLs).
+        logoUrl: isUrl(draft.logoUri) ? draft.logoUri! : undefined,
+        galleryUrls: draft.photos.filter(isUrl),
+      });
       await merchantStorage.save({
         category: draft.category,
         businessName: draft.businessName,
@@ -59,14 +85,6 @@ export default function MerchantSetup3Screen() {
         contactNumber: draft.contactNumber,
         services: draft.services,
       });
-      await createMerchant.mutateAsync({
-        businessName: draft.businessName,
-        description: draft.businessBio,
-        category: draft.category,
-        address: draft.address,
-        logo: draft.logoUri,
-        gallery: draft.photos,
-      });
       router.replace({
         pathname: '/merchant-submitted',
         params: { flow: 'partner' },
@@ -74,12 +92,8 @@ export default function MerchantSetup3Screen() {
     } catch (e: any) {
       Alert.alert(
         'Submission failed',
-        e?.message ?? 'Saved locally — sync failed. Try again from edit screen.',
+        e?.message ?? 'Could not submit your application. Please try again.',
       );
-      router.replace({
-        pathname: '/merchant-submitted',
-        params: { flow: 'partner' },
-      });
     }
   };
 

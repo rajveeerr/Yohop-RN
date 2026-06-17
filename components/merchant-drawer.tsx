@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { useLogout } from '@/hooks/use-auth';
-import { MERCHANT_BUSINESS } from '@/constants/merchant-mock';
 import { useStoredMerchantProfile } from '@/stores/merchant-draft';
 import { AppDrawer, type DrawerSection, type DrawerItem } from './app-drawer';
 
@@ -15,11 +14,11 @@ export function MerchantDrawer({
   const router = useRouter();
   const logout = useLogout();
   const profile = useStoredMerchantProfile();
-  const displayName = profile?.businessName || MERCHANT_BUSINESS.name;
+  const displayName = profile?.businessName || 'Your business';
   const displayHandle =
     profile?.businessName
       ? `@${profile.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '')}`
-      : `@${MERCHANT_BUSINESS.handle}`;
+      : '@business';
 
   const handleLogout = () => {
     Alert.alert('Log out?', 'You will need to sign in again.', [
@@ -130,9 +129,9 @@ export function MerchantDrawer({
       onClose={onClose}
       header={{
         name: displayName,
-        tag: MERCHANT_BUSINESS.tier,
+        tag: 'MERCHANT',
         meta: displayHandle,
-        avatarColor: MERCHANT_BUSINESS.logoColor,
+        avatarColor: '#C4F27F',
       }}
       sections={sections}
       bottomItems={bottomItems}

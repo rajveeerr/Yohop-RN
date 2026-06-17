@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MerchantDrawer } from '@/components/merchant-drawer';
-import { MERCHANT_BUSINESS } from '@/constants/merchant-mock';
 import { useMe } from '@/hooks/use-auth';
 import { useMerchantStats } from '@/hooks/use-merchant-stats';
 import { useStoredMerchantProfile } from '@/stores/merchant-draft';
@@ -40,7 +39,7 @@ export default function MerchantHomeScreen() {
   const { data: me } = useMe();
   const { data: stats } = useMerchantStats(me?.merchantId ?? undefined);
 
-  const displayName = profile?.businessName || MERCHANT_BUSINESS.name;
+  const displayName = profile?.businessName || 'Your business';
   const firstName = me?.name?.split(' ')[0] ?? 'there';
 
   const data =
@@ -177,7 +176,7 @@ export default function MerchantHomeScreen() {
             label="Conv. Rate"
             value={
               stats?.conversionRate !== undefined
-                ? `${stats.conversionRate.toFixed(0)}%`
+                ? `${(stats.conversionRate * 100).toFixed(0)}%`
                 : '—'
             }
             delta={
